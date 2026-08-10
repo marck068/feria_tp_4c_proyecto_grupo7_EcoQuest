@@ -47,7 +47,7 @@ const CONTENEDORES = [
     { categoria: "vidrio", x: 480, y: 72 },
     { categoria: "organico", x: 670, y: 72 },
     { categoria: "metal", x: 860, y: 72 },
-].map((item) => ({...item, radio: 44 }));
+].map((item) => ({ ...item, radio: 44 }));
 
 const canvas = document.querySelector("#canvas-juego");
 const ctx = canvas.getContext("2d");
@@ -113,19 +113,9 @@ let audioCtx = null;
 let mensajeTimer = null;
 let idResiduo = 0;
 const red = {
-    modo: "solo",
-    codigo: "",
-    token: "",
-    jugadorId: "",
-    anfitrion: false,
-    jugadores: [],
-    intervalo: null,
-    envioAnterior: 0,
-    partidaIniciada: false,
-    enviando: false,
-    suavizados: {},
-    desfaseServidor: 0,
-    relojSincronizado: false,
+    modo: "solo", codigo: "", token: "", jugadorId: "", anfitrion: false,
+    jugadores: [], intervalo: null, envioAnterior: 0, partidaIniciada: false,
+    enviando: false, suavizados: {}, desfaseServidor: 0, relojSincronizado: false,
 };
 
 function cargarAjustes() {
@@ -141,11 +131,8 @@ function guardarAjustes() {
 }
 
 function aleatorio(min, max) { return min + Math.random() * (max - min); }
-
 function distancia(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
-
 function limitar(valor, min, max) { return Math.max(min, Math.min(max, valor)); }
-
 function elegir(lista) { return lista[Math.floor(Math.random() * lista.length)]; }
 
 function mostrarPantalla(activa) {
@@ -155,48 +142,21 @@ function mostrarPantalla(activa) {
 function desconectarSala() {
     clearInterval(red.intervalo);
     Object.assign(red, {
-        modo: "solo",
-        codigo: "",
-        token: "",
-        jugadorId: "",
-        anfitrion: false,
-        jugadores: [],
-        intervalo: null,
-        partidaIniciada: false,
-        enviando: false,
-        suavizados: {},
-        desfaseServidor: 0,
-        relojSincronizado: false,
+        modo: "solo", codigo: "", token: "", jugadorId: "", anfitrion: false,
+        jugadores: [], intervalo: null, partidaIniciada: false,
+        enviando: false, suavizados: {}, desfaseServidor: 0, relojSincronizado: false,
     });
     $("#hud-red").classList.add("oculto");
 }
 
 function reiniciar() {
     Object.assign(estado, {
-        residuos: [],
-        particulas: [],
-        llevando: null,
-        puntos: 0,
-        reciclados: 0,
-        combo: 0,
-        mejorCombo: 0,
-        entregas: 0,
-        errores: 0,
-        tiempo: DURACION,
-        mision: 0,
-        progresoMision: 0,
-        aparicion: 0,
-        jugando: false,
-        pausado: false,
-        enCuenta: true,
-        ultimoTiempo: null,
-        sacudida: 0,
-        vida: 3,
-        invulnerable: 0,
-        ayudas: [],
-        aparicionAyuda: 6,
-        boost: null,
-        boostRestante: 0,
+        residuos: [], particulas: [], llevando: null, puntos: 0, reciclados: 0,
+        combo: 0, mejorCombo: 0, entregas: 0, errores: 0, tiempo: DURACION,
+        mision: 0, progresoMision: 0, aparicion: 0, jugando: false,
+        pausado: false, enCuenta: true, ultimoTiempo: null, sacudida: 0,
+        vida: 3, invulnerable: 0, ayudas: [], aparicionAyuda: 6,
+        boost: null, boostRestante: 0,
     });
     Object.assign(estado.jugador, { x: 480, y: 500, vx: 0, vy: 0, dirX: 0, dirY: -1, energia: 100 });
     Object.keys(entrada).forEach((clave) => { entrada[clave] = false; });
@@ -229,7 +189,7 @@ async function comenzarDesdeSala(sala) {
     $("#hud-red").classList.remove("oculto");
     $("#hud-modo").textContent = red.modo === "cooperativo" ? "Equipo" : "Versus";
     if (sala) aplicarEstadoCompartido(sala);
-    await cuentaAtrasRed(sala ? .inicio_ms);
+    await cuentaAtrasRed(sala?.inicio_ms);
     estado.jugando = true;
     estado.enCuenta = false;
     estado.ultimoTiempo = performance.now();
@@ -238,7 +198,7 @@ async function comenzarDesdeSala(sala) {
 
 async function cuentaAtras() {
     ui.cuenta.classList.remove("oculto");
-    for (const texto of["3", "2", "1", "¡Vamos!"]) {
+    for (const texto of ["3", "2", "1", "¡Vamos!"]) {
         ui.cuenta.textContent = texto;
         tono(texto === "¡Vamos!" ? 640 : 360, .08);
         await new Promise((resolver) => setTimeout(resolver, texto === "¡Vamos!" ? 350 : 500));
@@ -272,35 +232,25 @@ function crearResiduo(especialPermitido = true) {
     let posicion;
     for (let intento = 0; intento < 30; intento += 1) {
         posicion = { x: aleatorio(55, 905), y: aleatorio(175, 550) };
-        const libre = CONTENEDORES.every((c) => distancia(posicion, c) > 100) &&
-            distancia(posicion, estado.jugador) > 90 &&
-            estado.residuos.every((r) => distancia(posicion, r) > 55);
+        const libre = CONTENEDORES.every((c) => distancia(posicion, c) > 100)
+            && distancia(posicion, estado.jugador) > 90
+            && estado.residuos.every((r) => distancia(posicion, r) > 55);
         if (libre) break;
     }
     const tipo = elegir(TIPOS);
     const dorado = especialPermitido && estado.mision === 2 && Math.random() < .2;
     const contaminacion = CONTAMINACION[tipo.nivel];
     estado.residuos.push({
-        ...tipo,
-        ...posicion,
-        id: ++idResiduo,
-        dorado,
-        pulso: Math.random() * 6.28,
-        vida: contaminacion.duracion,
+        ...tipo, ...posicion, id: ++idResiduo, dorado,
+        pulso: Math.random() * 6.28, vida: contaminacion.duracion,
         vidaMaxima: contaminacion.duracion,
     });
 }
 
 function manejarEntrada(codigo, activa) {
     const mapa = {
-        KeyW: "arriba",
-        ArrowUp: "arriba",
-        KeyS: "abajo",
-        ArrowDown: "abajo",
-        KeyA: "izquierda",
-        ArrowLeft: "izquierda",
-        KeyD: "derecha",
-        ArrowRight: "derecha",
+        KeyW: "arriba", ArrowUp: "arriba", KeyS: "abajo", ArrowDown: "abajo",
+        KeyA: "izquierda", ArrowLeft: "izquierda", KeyD: "derecha", ArrowRight: "derecha",
         Space: "correr",
     };
     if (mapa[codigo]) {
@@ -316,7 +266,7 @@ window.addEventListener("keydown", (evento) => {
         elemento instanceof HTMLInputElement ||
         elemento instanceof HTMLTextAreaElement ||
         elemento instanceof HTMLSelectElement ||
-        elemento ? .isContentEditable;
+        elemento?.isContentEditable;
 
     // No interceptar letras cuando el jugador escribe su nombre o el código.
     if (escribiendo) return;
@@ -339,18 +289,15 @@ window.addEventListener("blur", () => {
 
 document.querySelectorAll("[data-direccion]").forEach((boton) => {
     const direccion = boton.dataset.direccion;
-    const activar = (evento) => { evento.preventDefault();
-        entrada[direccion] = true; };
-    const soltar = (evento) => { evento.preventDefault();
-        entrada[direccion] = false; };
+    const activar = (evento) => { evento.preventDefault(); entrada[direccion] = true; };
+    const soltar = (evento) => { evento.preventDefault(); entrada[direccion] = false; };
     boton.addEventListener("pointerdown", activar);
     boton.addEventListener("pointerup", soltar);
     boton.addEventListener("pointercancel", soltar);
     boton.addEventListener("pointerleave", soltar);
 });
 const botonCorrer = $("#boton-correr");
-botonCorrer.addEventListener("pointerdown", (e) => { e.preventDefault();
-    entrada.correr = true; });
+botonCorrer.addEventListener("pointerdown", (e) => { e.preventDefault(); entrada.correr = true; });
 ["pointerup", "pointercancel", "pointerleave"].forEach((tipo) => botonCorrer.addEventListener(tipo, () => { entrada.correr = false; }));
 
 function alternarPausa() {
@@ -371,10 +318,8 @@ function actualizar(delta) {
     const moviendo = dx !== 0 || dy !== 0;
     if (moviendo) {
         const largo = Math.hypot(dx, dy);
-        dx /= largo;
-        dy /= largo;
-        j.dirX = dx;
-        j.dirY = dy;
+        dx /= largo; dy /= largo;
+        j.dirX = dx; j.dirY = dy;
     }
 
     const corriendo = entrada.correr && moviendo && j.energia > 1;
@@ -422,9 +367,7 @@ function actualizar(delta) {
         }
         estado.tiempo = Math.max(0, estado.tiempo - delta);
     }
-    estado.particulas.forEach((p) => { p.x += p.vx * delta;
-        p.y += p.vy * delta;
-        p.vida -= delta; });
+    estado.particulas.forEach((p) => { p.x += p.vx * delta; p.y += p.vy * delta; p.vida -= delta; });
     estado.particulas = estado.particulas.filter((p) => p.vida > 0);
     estado.sacudida = Math.max(0, estado.sacudida - delta * 24);
     sincronizarJugador();
@@ -447,9 +390,9 @@ function procesarCaducidad(delta) {
     estado.residuos = estado.residuos.filter((residuo) => residuo.vida > 0);
     expirados.forEach((residuo) => {
         crearParticulas(residuo.x, residuo.y, CONTAMINACION[residuo.nivel].color, 8);
-        if (residuo.nivel >= 2) recibirDano(residuo.nivel === 3 ?
-            "Un residuo altamente contaminante dañó el parque" :
-            "Un residuo contaminante desapareció");
+        if (residuo.nivel >= 2) recibirDano(residuo.nivel === 3
+            ? "Un residuo altamente contaminante dañó el parque"
+            : "Un residuo contaminante desapareció");
     });
 }
 
@@ -467,16 +410,13 @@ function recibirDano(motivo) {
 function crearAyuda() {
     if (estado.ayudas.length >= 1) return;
     const necesitaVida = estado.vida < estado.vidaMaxima;
-    const opciones = necesitaVida ?
-        ["vida", "vida", "velocidad", "puntos"] :
-        ["velocidad", "puntos"];
+    const opciones = necesitaVida
+        ? ["vida", "vida", "velocidad", "puntos"]
+        : ["velocidad", "puntos"];
     estado.ayudas.push({
-        id: `ayuda-${++idResiduo}`,
-        tipo: elegir(opciones),
-        x: aleatorio(70, ANCHO - 70),
-        y: aleatorio(190, ALTO - 55),
-        vida: 9,
-        pulso: Math.random() * 6.28,
+        id: `ayuda-${++idResiduo}`, tipo: elegir(opciones),
+        x: aleatorio(70, ANCHO - 70), y: aleatorio(190, ALTO - 55),
+        vida: 9, pulso: Math.random() * 6.28,
     });
 }
 
@@ -573,7 +513,7 @@ function crearParticulas(x, y, color, cantidad) {
 function tono(frecuencia, duracion) {
     if (!ajustes.sonido) return;
     try {
-        audioCtx || = new(window.AudioContext || window.webkitAudioContext)();
+        audioCtx ||= new (window.AudioContext || window.webkitAudioContext)();
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
         osc.type = "sine";
@@ -645,52 +585,29 @@ function dibujarParque() {
     ctx.fillRect(0, 0, ANCHO, ALTO);
     ctx.fillStyle = "#d9c48e";
     ctx.beginPath();
-    ctx.moveTo(405, 120);
-    ctx.bezierCurveTo(360, 260, 440, 360, 350, 600);
-    ctx.lineTo(610, 600);
-    ctx.bezierCurveTo(550, 370, 620, 260, 555, 120);
-    ctx.closePath();
-    ctx.fill();
+    ctx.moveTo(405, 120); ctx.bezierCurveTo(360, 260, 440, 360, 350, 600);
+    ctx.lineTo(610, 600); ctx.bezierCurveTo(550, 370, 620, 260, 555, 120);
+    ctx.closePath(); ctx.fill();
     ctx.strokeStyle = "rgba(55,112,61,.2)";
     ctx.lineWidth = 2;
     for (let x = 20; x < ANCHO; x += 48) {
         for (let y = 160 + (x % 90); y < ALTO; y += 95) {
-            ctx.beginPath();
-            ctx.moveTo(x, y + 7);
-            ctx.quadraticCurveTo(x - 5, y, x - 2, y - 7);
-            ctx.moveTo(x, y + 7);
-            ctx.quadraticCurveTo(x + 6, y, x + 4, y - 8);
-            ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(x, y + 7); ctx.quadraticCurveTo(x - 5, y, x - 2, y - 7);
+            ctx.moveTo(x, y + 7); ctx.quadraticCurveTo(x + 6, y, x + 4, y - 8); ctx.stroke();
         }
     }
-    dibujarArbusto(35, 180, 1.1);
-    dibujarArbusto(920, 205, 1.2);
-    dibujarArbusto(70, 510, .9);
-    dibujarArbusto(885, 505, 1);
+    dibujarArbusto(35, 180, 1.1); dibujarArbusto(920, 205, 1.2);
+    dibujarArbusto(70, 510, .9); dibujarArbusto(885, 505, 1);
     ctx.fillStyle = "rgba(255,255,255,.52)";
     ctx.fillRect(0, 132, ANCHO, 3);
 }
 
 function dibujarArbusto(x, y, escala) {
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.scale(escala, escala);
+    ctx.save(); ctx.translate(x, y); ctx.scale(escala, escala);
     ctx.fillStyle = "#397446";
-    [
-        [0, 0, 23],
-        [18, 5, 18],
-        [-17, 7, 17]
-    ].forEach(([cx, cy, r]) => { ctx.beginPath();
-        ctx.arc(cx, cy, r, 0, Math.PI * 2);
-        ctx.fill(); });
+    [[0,0,23],[18,5,18],[-17,7,17]].forEach(([cx,cy,r]) => { ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill(); });
     ctx.fillStyle = "#f4c542";
-    [
-        [-12, -2],
-        [13, 2],
-        [2, -13]
-    ].forEach(([cx, cy]) => { ctx.beginPath();
-        ctx.arc(cx, cy, 2.5, 0, Math.PI * 2);
-        ctx.fill(); });
+    [[-12,-2],[13,2],[2,-13]].forEach(([cx,cy]) => { ctx.beginPath(); ctx.arc(cx, cy, 2.5, 0, Math.PI * 2); ctx.fill(); });
     ctx.restore();
 }
 
@@ -698,31 +615,13 @@ function dibujarContenedores() {
     CONTENEDORES.forEach((c) => {
         const cat = CATEGORIAS[c.categoria];
         const cerca = estado.llevando && distancia(estado.jugador, c) < 100;
-        ctx.save();
-        ctx.translate(c.x, c.y);
-        if (cerca) { ctx.strokeStyle = estado.llevando.categoria === c.categoria ? "#fff8cf" : "#b9382d";
-            ctx.lineWidth = 5;
-            ctx.beginPath();
-            ctx.arc(0, 0, 52, 0, Math.PI * 2);
-            ctx.stroke(); }
-        ctx.fillStyle = "rgba(23,51,45,.18)";
-        ctx.beginPath();
-        ctx.ellipse(0, 39, 39, 10, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = cat.color;
-        rectRedondo(-34, -30, 68, 70, 10);
-        ctx.fill();
-        ctx.fillStyle = "#17332d";
-        rectRedondo(-38, -35, 76, 14, 6);
-        ctx.fill();
-        ctx.fillStyle = "#fffaf0";
-        ctx.font = "700 22px 'Atkinson Hyperlegible'";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(cat.simbolo, 0, 2);
-        ctx.fillStyle = "#17332d";
-        ctx.font = "700 13px 'Atkinson Hyperlegible'";
-        ctx.fillText(cat.corto, 0, 55);
+        ctx.save(); ctx.translate(c.x, c.y);
+        if (cerca) { ctx.strokeStyle = estado.llevando.categoria === c.categoria ? "#fff8cf" : "#b9382d"; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(0, 0, 52, 0, Math.PI * 2); ctx.stroke(); }
+        ctx.fillStyle = "rgba(23,51,45,.18)"; ctx.beginPath(); ctx.ellipse(0, 39, 39, 10, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = cat.color; rectRedondo(-34, -30, 68, 70, 10); ctx.fill();
+        ctx.fillStyle = "#17332d"; rectRedondo(-38, -35, 76, 14, 6); ctx.fill();
+        ctx.fillStyle = "#fffaf0"; ctx.font = "700 22px 'Atkinson Hyperlegible'"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(cat.simbolo, 0, 2);
+        ctx.fillStyle = "#17332d"; ctx.font = "700 13px 'Atkinson Hyperlegible'"; ctx.fillText(cat.corto, 0, 55);
         ctx.restore();
     });
 }
@@ -733,23 +632,12 @@ function dibujarResiduos() {
         const flotacion = Math.sin(ahora * 3 + r.pulso) * 3;
         const contaminacion = CONTAMINACION[r.nivel];
         const urgente = r.vida <= 3;
-        ctx.save();
-        ctx.translate(r.x, r.y + flotacion);
-        ctx.fillStyle = "rgba(23,51,45,.18)";
-        ctx.beginPath();
-        ctx.ellipse(0, 18, 20, 7, 0, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.save(); ctx.translate(r.x, r.y + flotacion);
+        ctx.fillStyle = "rgba(23,51,45,.18)"; ctx.beginPath(); ctx.ellipse(0, 18, 20, 7, 0, 0, Math.PI * 2); ctx.fill();
         if (r.dorado) {
-            ctx.strokeStyle = "#f4c542";
-            ctx.lineWidth = 5;
-            ctx.beginPath();
-            ctx.arc(0, 0, 25 + Math.sin(ahora * 5) * 2, 0, Math.PI * 2);
-            ctx.stroke();
+            ctx.strokeStyle = "#f4c542"; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(0, 0, 25 + Math.sin(ahora * 5) * 2, 0, Math.PI * 2); ctx.stroke();
         }
-        ctx.fillStyle = "#fffaf0";
-        ctx.beginPath();
-        ctx.arc(0, 0, 22, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.fillStyle = "#fffaf0"; ctx.beginPath(); ctx.arc(0, 0, 22, 0, Math.PI * 2); ctx.fill();
         ctx.strokeStyle = contaminacion.color;
         ctx.lineWidth = urgente ? 5 : 3;
         ctx.globalAlpha = urgente ? .55 + Math.sin(ahora * 12) * .35 : 1;
@@ -757,10 +645,7 @@ function dibujarResiduos() {
         ctx.arc(0, 0, 26, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (r.vida / r.vidaMaxima));
         ctx.stroke();
         ctx.globalAlpha = 1;
-        ctx.font = "25px serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(r.icono, 0, 1);
+        ctx.font = "25px serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(r.icono, 0, 1);
         ctx.fillStyle = contaminacion.color;
         ctx.font = "700 10px 'Atkinson Hyperlegible'";
         ctx.fillText(contaminacion.marca, 0, 34);
@@ -776,23 +661,15 @@ function dibujarAyudas() {
         ctx.translate(ayuda.x, ayuda.y);
         ctx.scale(escala, escala);
         ctx.fillStyle = "rgba(23,51,45,.18)";
-        ctx.beginPath();
-        ctx.ellipse(0, 20, 22, 7, 0, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.beginPath(); ctx.ellipse(0, 20, 22, 7, 0, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = ayuda.tipo === "vida" ? "#fffaf0" : "#f4c542";
-        ctx.strokeStyle = "#173f35";
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(0, 0, 23, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
+        ctx.strokeStyle = "#173f35"; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(0, 0, 23, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
         ctx.fillStyle = ayuda.tipo === "vida" ? "#b73d32" : "#173f35";
         ctx.font = ayuda.tipo === "vida" ? "700 25px sans-serif" : "700 23px sans-serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
+        ctx.textAlign = "center"; ctx.textBaseline = "middle";
         ctx.fillText(ayuda.tipo === "vida" ? "♥" : ayuda.tipo === "velocidad" ? "⚡" : "×2", 0, 1);
-        ctx.fillStyle = "#173f35";
-        ctx.font = "700 10px 'Atkinson Hyperlegible'";
+        ctx.fillStyle = "#173f35"; ctx.font = "700 10px 'Atkinson Hyperlegible'";
         ctx.fillText(ayuda.tipo === "vida" ? "VIDA" : "BOOST", 0, 36);
         ctx.restore();
     });
@@ -802,40 +679,19 @@ function dibujarJugador() {
     const j = estado.jugador;
     const andando = Math.hypot(j.vx, j.vy) > 20;
     const paso = andando ? Math.sin(performance.now() / 75) * 2 : 0;
-    ctx.save();
-    ctx.translate(j.x, j.y + paso);
-    ctx.fillStyle = "rgba(23,51,45,.22)";
-    ctx.beginPath();
-    ctx.ellipse(0, 20 - paso, 20, 7, 0, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.save(); ctx.translate(j.x, j.y + paso);
+    ctx.fillStyle = "rgba(23,51,45,.22)"; ctx.beginPath(); ctx.ellipse(0, 20 - paso, 20, 7, 0, 0, Math.PI * 2); ctx.fill();
     const aspecto = PERSONAJES[estado.personaje] || PERSONAJES.exploradora;
-    ctx.fillStyle = aspecto.piel;
-    ctx.beginPath();
-    ctx.arc(0, -8, 13, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = aspecto.camiseta;
-    rectRedondo(-17, 1, 34, 31, 12);
-    ctx.fill();
+    ctx.fillStyle = aspecto.piel; ctx.beginPath(); ctx.arc(0, -8, 13, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = aspecto.camiseta; rectRedondo(-17, 1, 34, 31, 12); ctx.fill();
     ctx.fillStyle = aspecto.pelo;
-    ctx.beginPath();
-    ctx.arc(-1, -13, 16, Math.PI, aspecto.peloLargo ? Math.PI * 2.2 : Math.PI * 2);
-    ctx.fill();
-    if (aspecto.peloLargo) { ctx.fillRect(-16, -13, 5, 24);
-        ctx.fillRect(11, -13, 5, 24); }
+    ctx.beginPath(); ctx.arc(-1, -13, 16, Math.PI, aspecto.peloLargo ? Math.PI * 2.2 : Math.PI * 2); ctx.fill();
+    if (aspecto.peloLargo) { ctx.fillRect(-16, -13, 5, 24); ctx.fillRect(11, -13, 5, 24); }
     ctx.fillStyle = "#17332d";
-    ctx.beginPath();
-    ctx.arc(-5, -7, 1.5, 0, Math.PI * 2);
-    ctx.arc(5, -7, 1.5, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.beginPath(); ctx.arc(-5, -7, 1.5, 0, Math.PI * 2); ctx.arc(5, -7, 1.5, 0, Math.PI * 2); ctx.fill();
     if (estado.llevando) {
-        ctx.fillStyle = estado.llevando.dorado ? "#f4c542" : "#fffaf0";
-        ctx.beginPath();
-        ctx.arc(0, -38, 17, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.font = "20px serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(estado.llevando.icono, 0, -38);
+        ctx.fillStyle = estado.llevando.dorado ? "#f4c542" : "#fffaf0"; ctx.beginPath(); ctx.arc(0, -38, 17, 0, Math.PI * 2); ctx.fill();
+        ctx.font = "20px serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(estado.llevando.icono, 0, -38);
     }
     ctx.restore();
 }
@@ -854,24 +710,11 @@ function dibujarJugadorRemoto(jugador) {
     ctx.save();
     ctx.globalAlpha = .88;
     ctx.translate(anterior.x, anterior.y);
-    ctx.fillStyle = "rgba(23,51,45,.2)";
-    ctx.beginPath();
-    ctx.ellipse(0, 20, 20, 7, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = aspecto.camiseta;
-    rectRedondo(-17, 1, 34, 31, 12);
-    ctx.fill();
-    ctx.fillStyle = aspecto.piel;
-    ctx.beginPath();
-    ctx.arc(0, -8, 13, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = aspecto.pelo;
-    ctx.beginPath();
-    ctx.arc(0, -13, 16, Math.PI, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "#17332d";
-    ctx.font = "700 13px 'Atkinson Hyperlegible'";
-    ctx.textAlign = "center";
+    ctx.fillStyle = "rgba(23,51,45,.2)"; ctx.beginPath(); ctx.ellipse(0, 20, 20, 7, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = aspecto.camiseta; rectRedondo(-17, 1, 34, 31, 12); ctx.fill();
+    ctx.fillStyle = aspecto.piel; ctx.beginPath(); ctx.arc(0, -8, 13, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = aspecto.pelo; ctx.beginPath(); ctx.arc(0, -13, 16, Math.PI, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#17332d"; ctx.font = "700 13px 'Atkinson Hyperlegible'"; ctx.textAlign = "center";
     ctx.fillText(jugador.nombre, 0, -31);
     ctx.restore();
 }
@@ -880,18 +723,13 @@ function dibujarParticulas() {
     estado.particulas.forEach((p) => {
         ctx.globalAlpha = limitar(p.vida * 2, 0, 1);
         ctx.fillStyle = p.color;
-        ctx.save();
-        ctx.translate(p.x, p.y);
-        ctx.rotate(p.vida * 5);
-        ctx.fillRect(-p.tam / 2, -p.tam / 2, p.tam, p.tam * .55);
-        ctx.restore();
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.vida * 5); ctx.fillRect(-p.tam / 2, -p.tam / 2, p.tam, p.tam * .55); ctx.restore();
     });
     ctx.globalAlpha = 1;
 }
 
 function rectRedondo(x, y, w, h, r) {
-    ctx.beginPath();
-    ctx.roundRect(x, y, w, h, r);
+    ctx.beginPath(); ctx.roundRect(x, y, w, h, r);
 }
 
 function bucle(timestamp) {
@@ -912,14 +750,14 @@ function terminar(completado = false, causa = "tiempo") {
     $("#final-reciclados").textContent = estado.reciclados;
     $("#final-racha").textContent = estado.mejorCombo;
     $("#final-precision").textContent = `${precision}%`;
-    $("#titulo-final").textContent = completado ?
-        "¡El parque vuelve a respirar!" :
-        causa === "sin-vida" ? "El parque necesita otra patrulla" : "La patrulla ha terminado";
+    $("#titulo-final").textContent = completado
+        ? "¡El parque vuelve a respirar!"
+        : causa === "sin-vida" ? "El parque necesita otra patrulla" : "La patrulla ha terminado";
     $("#final-resumen").textContent = `${estado.nombre}, clasificaste ${estado.reciclados} residuos y alcanzaste una racha de ${estado.mejorCombo}.`;
     $("#medalla-final").textContent = completado ? "🌳" : estado.reciclados >= 8 ? "🌿" : "🌱";
-    $("#final-reto").textContent = causa === "sin-vida" ?
-        "Próximo reto: prioriza los residuos con marca II y III antes de que expiren." :
-        precision < 80 ? "Próximo reto: supera el 80% de precisión." : estado.mejorCombo < 6 ? "Próximo reto: encadena 6 entregas correctas." : "Próximo reto: completa la patrulla con más tiempo restante.";
+    $("#final-reto").textContent = causa === "sin-vida"
+        ? "Próximo reto: prioriza los residuos con marca II y III antes de que expiren."
+        : precision < 80 ? "Próximo reto: supera el 80% de precisión." : estado.mejorCombo < 6 ? "Próximo reto: encadena 6 entregas correctas." : "Próximo reto: completa la patrulla con más tiempo restante.";
     mostrarPantalla(ui.final);
     tono(completado ? 880 : 420, .25);
     if (red.modo !== "solo") enviarEstadoRed(true);
@@ -1055,9 +893,9 @@ async function consultarSala() {
             return item;
         }));
         const completa = sala.jugadores.length === 2;
-        $("#sala-estado").textContent = completa ?
-            (red.anfitrion ? "La patrulla está lista." : "Esperando que el anfitrión inicie…") :
-            "Esperando al segundo jugador…";
+        $("#sala-estado").textContent = completa
+            ? (red.anfitrion ? "La patrulla está lista." : "Esperando que el anfitrión inicie…")
+            : "Esperando al segundo jugador…";
         $("#iniciar-sala").classList.toggle("oculto", !red.anfitrion || !completa || sala.estado === "jugando");
         actualizarMarcadorRed();
         if (sala.estado === "jugando") comenzarDesdeSala(sala);
@@ -1071,8 +909,7 @@ async function iniciarSala() {
     try {
         const inicioPeticion = performance.now();
         const sala = await peticionJSON(`/api/salas/${red.codigo}/iniciar`, {
-            method: "POST",
-            body: JSON.stringify({ token: red.token }),
+            method: "POST", body: JSON.stringify({ token: red.token }),
         });
         // El anfitrión entra inmediatamente; el invitado lo hace al recibir
         // el estado "jugando" en el siguiente sondeo.
@@ -1095,11 +932,8 @@ async function enviarEstadoRed(terminado) {
         const sala = await peticionJSON(`/api/salas/${red.codigo}/estado`, {
             method: "POST",
             body: JSON.stringify({
-                token: red.token,
-                x: estado.jugador.x,
-                y: estado.jugador.y,
-                vx: estado.jugador.vx,
-                vy: estado.jugador.vy,
+                token: red.token, x: estado.jugador.x, y: estado.jugador.y,
+                vx: estado.jugador.vx, vy: estado.jugador.vy,
                 terminado,
             }),
         });
@@ -1113,7 +947,7 @@ async function enviarEstadoRed(terminado) {
 }
 
 function actualizarRelojServidor(sala, inicioPeticion, finPeticion) {
-    if (!sala ? .servidor_ms) return;
+    if (!sala?.servidor_ms) return;
     const estimacionAhora = sala.servidor_ms + (finPeticion - inicioPeticion) / 2;
     const muestra = estimacionAhora - Date.now();
     if (!red.relojSincronizado) {
@@ -1125,7 +959,7 @@ function actualizarRelojServidor(sala, inicioPeticion, finPeticion) {
 }
 
 function aplicarEstadoCompartido(sala) {
-    if (!sala ? .jugadores || !sala.mundo) return;
+    if (!sala?.jugadores || !sala.mundo) return;
     red.jugadores = sala.jugadores;
     const propio = sala.jugadores.find((jugador) => jugador.id === red.jugadorId);
     if (!propio) return;
@@ -1136,9 +970,9 @@ function aplicarEstadoCompartido(sala) {
     estado.vida = propio.vida;
     estado.llevando = propio.llevando;
     estado.boost = propio.boost;
-    estado.boostRestante = propio.boost ?
-        Math.max(0, propio.boost_hasta - Date.now() / 1000) :
-        0;
+    estado.boostRestante = propio.boost
+        ? Math.max(0, propio.boost_hasta - Date.now() / 1000)
+        : 0;
     estado.residuos = sala.mundo.residuos;
     estado.ayudas = sala.mundo.ayudas;
     estado.tiempo = sala.mundo.tiempo;
@@ -1156,7 +990,7 @@ function actualizarMarcadorRed() {
         $("#hud-marcador").textContent = red.jugadores.reduce((total, j) => total + j.puntos, 0);
         $("#hud-rival").textContent = rival ? `${rival.nombre}: ${rival.puntos} · ${"♥".repeat(rival.vida)}` : "Esperando…";
     } else {
-        $("#hud-marcador").textContent = propio ? .puntos || estado.puntos;
+        $("#hud-marcador").textContent = propio?.puntos || estado.puntos;
         $("#hud-rival").textContent = rival ? `${rival.nombre}: ${rival.puntos} · ${"♥".repeat(rival.vida)}` : "Esperando…";
     }
 }
@@ -1197,9 +1031,7 @@ $("#boton-inicio").addEventListener("click", () => {
 $("#boton-pausa").addEventListener("click", alternarPausa);
 $("#boton-continuar").addEventListener("click", alternarPausa);
 $("#boton-salir").addEventListener("click", () => {
-    estado.jugando = false;
-    estado.pausado = false;
-    ui.pausa.classList.add("oculto");
+    estado.jugando = false; estado.pausado = false; ui.pausa.classList.add("oculto");
     desconectarSala();
     mostrarPantalla(ui.inicio);
 });
