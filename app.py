@@ -65,8 +65,8 @@ def jugador_publico(jugador):
     return {
         clave: jugador[clave]
         for clave in ("id", "nombre", "personaje", "x", "y", "puntos",
-                      "reciclados", "racha", "vida", "terminado", "llevando",
-                      "boost", "boost_hasta", "vx", "vy", "actualizacion_ms")
+                    "reciclados", "racha", "vida", "terminado", "llevando",
+                    "boost", "boost_hasta", "vx", "vy", "actualizacion_ms")
     }
 
 
