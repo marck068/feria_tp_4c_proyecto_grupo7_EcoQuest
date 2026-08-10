@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#173f35">
+    <title>EcoRecicla — Rescate del parque</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Baloo+2:wght@600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <main id="app">
+        <header class="cabecera">
+            <a class="marca" href="/" aria-label="EcoRecicla, inicio">
+                <span class="marca-hoja" aria-hidden="true">♻</span>
+                <span>EcoRecicla</span>
+            </a>
+            <button id="boton-ajustes" class="boton-icono" type="button" aria-label="Abrir ajustes">⚙</button>
+        </header>
+
+        <section id="pantalla-inicio" class="pantalla inicio" aria-labelledby="titulo-inicio">
+            <div class="hero">
+                <p class="ceja">Patrulla verde · Rescate contrarreloj</p>
+                <h1 id="titulo-inicio">El parque te necesita.</h1>
+                <p class="entradilla">Recoge, clasifica y encadena aciertos. Cada entrega recupera un rincón del parque, pero la basura no deja de llegar.</p>
+
+                <div class="como-jugar" aria-label="Cómo jugar">
+                    <div><strong>1</strong><span>Busca un residuo</span></div>
+                    <div><strong>2</strong><span>Llévalo al punto limpio</span></div>
+                    <div><strong>3</strong><span>Encadena para multiplicar</span></div>
+                </div>
+                <div class="leyenda-contaminacion" aria-label="Niveles de contaminación">
+                    <span><b class="nivel nivel-1">I</b>Baja · 8 puntos</span>
+                    <span><b class="nivel nivel-2">II</b>Media · 16 puntos</span>
+                    <span><b class="nivel nivel-3">III</b>Alta · 32 puntos</span>
+                    <small>El anillo muestra cuánto falta para que desaparezca.</small>
+                </div>
+
+                <form id="form-inicio" class="inicio-acciones">
+                    <label for="input-nombre">Nombre de guardaparques</label>
+                    <input id="input-nombre" name="nombre" maxlength="20" autocomplete="nickname" placeholder="Tu nombre">
+
+                    <fieldset class="selector-personaje">
+                        <legend>Escoge tu personaje</legend>
+                        <label class="personaje-opcion">
+                            <input type="radio" name="personaje" value="exploradora" checked>
+                            <span class="retrato retrato-exploradora" aria-hidden="true"><i></i></span>
+                            <strong>Sofía</strong><small>Exploradora</small>
+                        </label>
+                        <label class="personaje-opcion">
+                            <input type="radio" name="personaje" value="guardaparque">
+                            <span class="retrato retrato-guardaparque" aria-hidden="true"><i></i></span>
+                            <strong>Tomás</strong><small>Guardaparque</small>
+                        </label>
+                        <label class="personaje-opcion">
+                            <input type="radio" name="personaje" value="voluntaria">
+                            <span class="retrato retrato-voluntaria" aria-hidden="true"><i></i></span>
+                            <strong>Amaya</strong><small>Voluntaria</small>
+                        </label>
+                    </fieldset>
+
+                    <fieldset class="selector-modo">
+                        <legend>¿Cómo quieres jugar?</legend>
+                        <label><input type="radio" name="modo" value="solo" checked><span><strong>En solitario</strong><small>Tu propia patrulla</small></span></label>
+                        <label><input type="radio" name="modo" value="cooperativo"><span><strong>Cooperativo local</strong><small>Sumen puntos en equipo</small></span></label>
+                        <label><input type="radio" name="modo" value="versus"><span><strong>Versus local</strong><small>Compitan por el récord</small></span></label>
+                    </fieldset>
+
+                    <button class="boton-principal boton-iniciar" type="submit">Continuar <span aria-hidden="true">→</span></button>
+                </form>
+
+                <section id="panel-sala" class="panel-sala oculto" aria-labelledby="titulo-sala">
+                    <button id="volver-configuracion" class="enlace-volver" type="button">← Cambiar opciones</button>
+                    <p class="ceja">Multijugador local</p>
+                    <h2 id="titulo-sala">Reúne a tu patrulla</h2>
+                    <div id="acciones-sala">
+                        <button id="crear-sala" class="boton-principal" type="button">Crear sala</button>
+                        <span>o</span>
+                        <form id="form-unirse" class="form-unirse">
+                            <label for="codigo-sala">Código de sala</label>
+                            <input id="codigo-sala" maxlength="4" autocomplete="off" placeholder="ABCD">
+                            <button class="boton-secundario" type="submit">Unirme</button>
+                        </form>
+                    </div>
+                    <div id="sala-espera" class="sala-espera oculto">
+                        <p>Comparte este código con la otra persona:</p>
+                        <output id="sala-codigo" aria-label="Código de la sala">----</output>
+                        <ul id="sala-jugadores" aria-live="polite"></ul>
+                        <p id="sala-estado" role="status">Esperando al segundo jugador…</p>
+                        <button id="iniciar-sala" class="boton-principal oculto" type="button">Iniciar para ambos</button>
+                    </div>
+                    <p id="sala-error" class="error-sala oculto" role="alert"></p>
+                </section>
+                <p class="ayuda-controles"><kbd>WASD</kbd> / flechas para moverte · <kbd>Espacio</kbd> para correr · <kbd>P</kbd> pausa</p>
+            </div>
+
+            <aside class="panel-ranking" aria-labelledby="titulo-ranking-inicio">
+                <div class="panel-titulo">
+                    <div>
+                        <p class="ceja">Comunidad</p>
+                        <h2 id="titulo-ranking-inicio">Patrullas destacadas</h2>
+                    </div>
+                    <span aria-hidden="true">🏅</span>
+                </div>
+                <ol id="lista-ranking-inicio" class="ranking" aria-live="polite"><li class="vacio">Cargando patrullas…</li></ol>
+            </aside>
+        </section>
+
+        <section id="pantalla-juego" class="pantalla juego oculto" aria-label="Partida en curso">
+            <div class="barra-mision">
+                <div>
+                    <span class="ceja">Misión actual</span>
+                    <strong id="mision-texto">Limpia el sendero</strong>
+                </div>
+                <div class="progreso-wrap">
+                    <div class="progreso-datos"><span id="mision-progreso">0 / 4</span><span id="mision-etapa">Etapa 1 de 3</span></div>
+                    <div class="progreso" role="progressbar" aria-label="Progreso de misión" aria-valuemin="0" aria-valuemax="4" aria-valuenow="0"><span id="barra-progreso"></span></div>
+                </div>
+                <button id="boton-pausa" class="boton-icono" type="button" aria-label="Pausar partida">Ⅱ</button>
+            </div>
+
+            <div class="zona-juego">
+                <div id="hud" aria-label="Estado de la partida">
+                    <div id="hud-red" class="hud-red oculto"><span id="hud-modo">Equipo</span><strong id="hud-marcador">0</strong><small id="hud-rival"></small></div>
+                    <div class="hud-vida">
+                        <span>Vida</span>
+                        <strong id="hud-vida" aria-label="3 de 3 corazones">♥ ♥ ♥</strong>
+                    </div>
+                    <div class="hud-dato"><span>Puntos</span><strong id="hud-puntos">0</strong></div>
+                    <div class="hud-dato tiempo"><span>Tiempo</span><strong><span id="hud-tiempo">75</span><small>s</small></strong></div>
+                    <div class="hud-dato combo"><span>Racha</span><strong id="hud-combo">×1</strong></div>
+                    <div class="hud-objeto">
+                        <span>Llevas</span>
+                        <strong id="hud-objeto-actual">Manos libres</strong>
+                    </div>
+                    <div class="energia-wrap">
+                        <span>Energía</span>
+                        <div class="energia" role="meter" aria-label="Energía para correr" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span id="barra-energia"></span></div>
+                    </div>
+                    <div id="hud-boost" class="hud-boost oculto" role="status"><span>Potenciador</span><strong id="hud-boost-texto"></strong></div>
+                </div>
+
+                <div id="lienzo-wrap">
+                    <canvas id="canvas-juego" width="960" height="600" aria-label="Parque. Mueve al guardaparques para recoger y clasificar residuos.">
+                        Tu navegador no puede mostrar el parque interactivo. Actualízalo para jugar a EcoRecicla.
+                    </canvas>
+                    <div id="mensaje-flotante" class="mensaje oculto" role="status" aria-live="polite"></div>
+                    <div id="cuenta-atras" class="cuenta-atras oculto" aria-hidden="true"></div>
+                    <div id="pausa-overlay" class="overlay-pausa oculto">
+                        <p class="ceja">La patrulla espera</p>
+                        <h2>En pausa</h2>
+                        <button id="boton-continuar" class="boton-principal" type="button">Continuar</button>
+                        <button id="boton-salir" class="boton-secundario" type="button">Volver al inicio</button>
+                    </div>
+                </div>
+
+                <div id="controles-tactiles" aria-label="Controles táctiles">
+                    <div class="cruceta">
+                        <button data-direccion="arriba" aria-label="Mover arriba">▲</button>
+                        <button data-direccion="izquierda" aria-label="Mover izquierda">◀</button>
+                        <button data-direccion="abajo" aria-label="Mover abajo">▼</button>
+                        <button data-direccion="derecha" aria-label="Mover derecha">▶</button>
+                    </div>
+                    <button id="boton-correr" class="boton-correr" aria-label="Correr">⚡<span>Correr</span></button>
+                </div>
+            </div>
+        </section>
+
+        <section id="pantalla-final" class="pantalla final oculto" aria-labelledby="titulo-final">
+            <div class="resultado">
+                <p class="ceja">Informe de patrulla</p>
+                <div id="medalla-final" class="medalla" aria-hidden="true">🌱</div>
+                <h1 id="titulo-final">¡El parque respira mejor!</h1>
+                <p id="final-resumen" class="entradilla"></p>
+                <div class="resultado-grid">
+                    <div><span>Puntuación</span><strong id="final-puntos">0</strong></div>
+                    <div><span>Reciclados</span><strong id="final-reciclados">0</strong></div>
+                    <div><span>Mejor racha</span><strong id="final-racha">0</strong></div>
+                    <div><span>Precisión</span><strong id="final-precision">0%</strong></div>
+                </div>
+                <p id="final-reto" class="reto-final"></p>
+                <div class="acciones-final">
+                    <button id="boton-jugar-de-nuevo" class="boton-principal" type="button">Nueva patrulla</button>
+                    <button id="boton-inicio" class="boton-secundario" type="button">Cambiar nombre</button>
+                </div>
+            </div>
+            <aside class="panel-ranking" aria-labelledby="titulo-ranking-final">
+                <div class="panel-titulo"><h2 id="titulo-ranking-final">Clasificación local</h2><span aria-hidden="true">🏆</span></div>
+                <ol id="lista-ranking-final" class="ranking" aria-live="polite"></ol>
+            </aside>
+        </section>
+    </main>
+
+    <dialog id="dialogo-ajustes">
+        <form method="dialog">
+            <div class="dialogo-cabecera">
+                <div><p class="ceja">Accesibilidad</p><h2>Ajustes</h2></div>
+                <button class="boton-icono" value="cancel" aria-label="Cerrar ajustes">×</button>
+            </div>
+            <label class="interruptor"><span><strong>Sonido</strong><small>Señales y recompensas</small></span><input id="ajuste-sonido" type="checkbox" checked></label>
+            <label class="interruptor"><span><strong>Partículas</strong><small>Hojas, polvo y destellos</small></span><input id="ajuste-particulas" type="checkbox" checked></label>
+            <label class="interruptor"><span><strong>Sacudida de cámara</strong><small>Impactos y errores</small></span><input id="ajuste-sacudida" type="checkbox" checked></label>
+            <label class="interruptor"><span><strong>Alto contraste</strong><small>Refuerza bordes y señales</small></span><input id="ajuste-contraste" type="checkbox"></label>
+            <p class="nota-ajustes">Las categorías siempre usan texto y símbolos, nunca sólo color.</p>
+        </form>
+    </dialog>
+
+    <script src="{{ url_for('static', filename='js/game.js') }}"></script>
+</body>
+</html>
