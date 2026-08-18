@@ -4,17 +4,17 @@ const reducirMovimientoMini = window.matchMedia("(prefers-reduced-motion: reduce
 
 const MINI_CONFIG = {
     agua: {
-        titulo: "Las llaves de la plaza", instruccion: "Cierra las llaves que gotean: al cerrar unas, se abrirán otras.", duracion: 90, etapa: 2,
-        tutorial: "Evita que se desperdicie agua durante 1 minuto y 30 segundos. Siempre habrá tres llaves goteando: cuando cierres una, otra se abrirá.",
+        titulo: "Las llaves de la plaza", instruccion: "Cierra las llaves que gotean: al cerrar unas, se abrirán otras.", duracion: 60, etapa: 2,
+        tutorial: "Evita que se desperdicie agua durante 1 minuto. Siempre habrá tres llaves goteando: cuando cierres una, otra se abrirá.",
         control: "Toca o haz clic únicamente sobre las llaves que muestran una gota.",
     },
     energia: {
-        titulo: "La casa encendida", instruccion: "Recorre la casa con el puntero y apaga todas las luces.", duracion: 90, etapa: 3,
+        titulo: "La casa encendida", instruccion: "Recorre la casa con el puntero y apaga todas las luces.", duracion: 60, etapa: 3,
         tutorial: "Encuentra las seis habitaciones iluminadas y apaga sus luces antes de que se agote el tiempo.",
         control: "Toca o haz clic sobre cada habitación que tenga la bombilla encendida.",
     },
     reforestacion: {
-        titulo: "El bosque vuelve", instruccion: "Cava, planta y riega cada terreno en ese orden.", duracion: 90, etapa: 4,
+        titulo: "El bosque vuelve", instruccion: "Cava, planta y riega cada terreno en ese orden.", duracion: 60, etapa: 4,
         tutorial: "Recupera los seis terrenos siguiendo tres pasos en orden: cavar, plantar y regar.",
         control: "Elige una herramienta y luego toca el terreno donde quieres utilizarla.",
     },
