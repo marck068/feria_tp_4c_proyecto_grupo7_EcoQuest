@@ -2,7 +2,7 @@
 
 const ANCHO = 960;
 const ALTO = 600;
-const DURACION = 1;
+const DURACION = 100;
 const ECO_META = 75;
 const ESCALA_JUGADOR = 1.18;
 const LIMITE_JUGADOR = { izquierda: 46, derecha: ANCHO - 46, arriba: 138, abajo: ALTO - 96 };
