@@ -2,7 +2,10 @@
 
 const ANCHO = 960;
 const ALTO = 600;
-const DURACION = 75;
+const DURACION = 100;
+const ECO_META = 75;
+const ESCALA_JUGADOR = 1.18;
+const LIMITE_JUGADOR = { izquierda: 46, derecha: ANCHO - 46, arriba: 138, abajo: ALTO - 96 };
 
 const CATEGORIAS = {
     plastico: { nombre: "Plástico", corto: "PET", color: "#e3b83f", simbolo: "P" },
@@ -30,9 +33,9 @@ const CONTAMINACION = {
 };
 
 const MISIONES = [
-    { nombre: "Limpia el sendero", objetivo: 4, detalle: "Clasifica 4 residuos" },
-    { nombre: "Activa la racha verde", objetivo: 6, detalle: "Consigue 6 aciertos seguidos" },
-    { nombre: "Rescate del claro", objetivo: 7, detalle: "Recicla 7 residuos; los dorados valen más" },
+    { nombre: "Limpia el sendero", objetivo: 3, detalle: "Clasifica 3 residuos" },
+    { nombre: "Activa la racha verde", objetivo: 3, detalle: "Consigue 3 aciertos seguidos" },
+    { nombre: "Rescate del claro", objetivo: 4, detalle: "Recicla 4 residuos; los dorados valen más" },
 ];
 
 const PERSONAJES = {
@@ -51,8 +54,24 @@ const CONTENEDORES = [
 
 const canvas = document.querySelector("#canvas-juego");
 const ctx = canvas.getContext("2d");
+const movimientoReducido = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function configurarResolucionCanvas() {
+    const escala = Math.min(window.devicePixelRatio || 1, 2);
+    const anchoReal = Math.round(ANCHO * escala);
+    const altoReal = Math.round(ALTO * escala);
+    if (canvas.width !== anchoReal || canvas.height !== altoReal) {
+        canvas.width = anchoReal;
+        canvas.height = altoReal;
+    }
+    ctx.setTransform(escala, 0, 0, escala, 0, 0);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+}
+
+configurarResolucionCanvas();
 const $ = (selector) => document.querySelector(selector);
-const pantallas = ["#pantalla-inicio", "#pantalla-juego", "#pantalla-final"].map($);
+const pantallas = ["#pantalla-inicio", "#pantalla-juego", "#pantalla-final", "#pantalla-minijuego", "#pantalla-cuestionario"].map($);
 
 const ui = {
     inicio: $("#pantalla-inicio"),
@@ -77,7 +96,7 @@ const ui = {
 };
 
 const estado = {
-    jugador: { x: 480, y: 500, vx: 0, vy: 0, dirX: 0, dirY: -1, energia: 100 },
+    jugador: { x: 480, y: 430, vx: 0, vy: 0, dirX: 0, dirY: -1, energia: 100 },
     residuos: [],
     particulas: [],
     llevando: null,
@@ -105,11 +124,15 @@ const estado = {
     aparicionAyuda: 6,
     boost: null,
     boostRestante: 0,
+    ecosistema: { agua: 35, suelo: 35, vida: 35 },
+    tutorialPaso: 0,
 };
 
 const entrada = { arriba: false, abajo: false, izquierda: false, derecha: false, correr: false };
 const ajustes = cargarAjustes();
 let audioCtx = null;
+let musicaTimer = null;
+let pasoMusical = 0;
 let mensajeTimer = null;
 let idResiduo = 0;
 const red = {
@@ -120,9 +143,9 @@ const red = {
 
 function cargarAjustes() {
     try {
-        return { sonido: true, particulas: true, sacudida: true, contraste: false, ...JSON.parse(localStorage.getItem("eco-ajustes") || "{}") };
+        return { sonido: true, musica: true, particulas: true, sacudida: true, contraste: false, ...JSON.parse(localStorage.getItem("eco-ajustes") || "{}") };
     } catch {
-        return { sonido: true, particulas: true, sacudida: true, contraste: false };
+        return { sonido: true, musica: true, particulas: true, sacudida: true, contraste: false };
     }
 }
 
@@ -134,6 +157,7 @@ function aleatorio(min, max) { return min + Math.random() * (max - min); }
 function distancia(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
 function limitar(valor, min, max) { return Math.max(min, Math.min(max, valor)); }
 function elegir(lista) { return lista[Math.floor(Math.random() * lista.length)]; }
+function esModoLocal() { return red.modo === "solo" || red.modo === "ecosistema"; }
 
 function mostrarPantalla(activa) {
     pantallas.forEach((pantalla) => pantalla.classList.toggle("oculto", pantalla !== activa));
@@ -156,24 +180,50 @@ function reiniciar() {
         mision: 0, progresoMision: 0, aparicion: 0, jugando: false,
         pausado: false, enCuenta: true, ultimoTiempo: null, sacudida: 0,
         vida: 3, invulnerable: 0, ayudas: [], aparicionAyuda: 6,
-        boost: null, boostRestante: 0,
+        boost: null, boostRestante: 0, ecosistema: { agua: 35, suelo: 35, vida: 35 }, tutorialPaso: 0,
     });
-    Object.assign(estado.jugador, { x: 480, y: 500, vx: 0, vy: 0, dirX: 0, dirY: -1, energia: 100 });
+    Object.assign(estado.jugador, { x: 480, y: 430, vx: 0, vy: 0, dirX: 0, dirY: -1, energia: 100 });
     Object.keys(entrada).forEach((clave) => { entrada[clave] = false; });
     for (let i = 0; i < 4; i += 1) crearResiduo(false);
     actualizarHUD();
+    configurarTutorial();
     dibujar();
+}
+
+const PASOS_TUTORIAL = [
+    ["Muévete por el parque", "Usa las flechas, WASD o la cruceta táctil. Avanzarás al moverte."],
+    ["Recoge un residuo", "Camina hasta un residuo. Sólo puedes transportar uno a la vez."],
+    ["Clasifícalo", "Llévalo al contenedor que coincide con su símbolo y categoría."],
+];
+
+function configurarTutorial() { estado.tutorialPaso = 0; actualizarTutorial(); }
+function actualizarTutorial() {
+    const panel = $("#tutorial");
+    if (estado.tutorialPaso >= PASOS_TUTORIAL.length) {
+        panel.classList.add("oculto");
+        localStorage.setItem("eco-tutorial-completado", "1");
+        return;
+    }
+    panel.classList.remove("oculto");
+    $("#tutorial-numero").textContent = `${estado.tutorialPaso + 1} de ${PASOS_TUTORIAL.length}`;
+    $("#tutorial-titulo").textContent = PASOS_TUTORIAL[estado.tutorialPaso][0];
+    $("#tutorial-texto").textContent = PASOS_TUTORIAL[estado.tutorialPaso][1];
+}
+function avanzarTutorial(paso) {
+    if (estado.tutorialPaso === paso) { estado.tutorialPaso += 1; actualizarTutorial(); }
 }
 
 async function comenzar() {
     estado.nombre = ui.nombre.value.trim() || "Guardaparques";
     estado.personaje = document.querySelector('input[name="personaje"]:checked').value;
+    Campania.comenzar(estado.nombre, red.modo);
     reiniciar();
     mostrarPantalla(ui.juego);
     await cuentaAtras();
     estado.jugando = true;
     estado.enCuenta = false;
     estado.ultimoTiempo = performance.now();
+    iniciarMusica();
     requestAnimationFrame(bucle);
 }
 
@@ -184,6 +234,7 @@ async function comenzarDesdeSala(sala) {
     red.intervalo = null;
     estado.nombre = ui.nombre.value.trim() || "Guardaparques";
     estado.personaje = document.querySelector('input[name="personaje"]:checked').value;
+    Campania.comenzar(estado.nombre, red.modo);
     reiniciar();
     mostrarPantalla(ui.juego);
     $("#hud-red").classList.remove("oculto");
@@ -193,6 +244,7 @@ async function comenzarDesdeSala(sala) {
     estado.jugando = true;
     estado.enCuenta = false;
     estado.ultimoTiempo = performance.now();
+    iniciarMusica();
     requestAnimationFrame(bucle);
 }
 
@@ -305,6 +357,7 @@ function alternarPausa() {
     estado.pausado = !estado.pausado;
     ui.pausa.classList.toggle("oculto", !estado.pausado);
     $("#boton-pausa").textContent = estado.pausado ? "▶" : "Ⅱ";
+    if (estado.pausado) detenerMusica(); else iniciarMusica();
     if (!estado.pausado) {
         estado.ultimoTiempo = performance.now();
         requestAnimationFrame(bucle);
@@ -316,6 +369,7 @@ function actualizar(delta) {
     let dx = Number(entrada.derecha) - Number(entrada.izquierda);
     let dy = Number(entrada.abajo) - Number(entrada.arriba);
     const moviendo = dx !== 0 || dy !== 0;
+    if (moviendo) avanzarTutorial(0);
     if (moviendo) {
         const largo = Math.hypot(dx, dy);
         dx /= largo; dy /= largo;
@@ -328,21 +382,22 @@ function actualizar(delta) {
     const respuesta = moviendo ? 12 : 16;
     j.vx += (dx * velocidad - j.vx) * Math.min(1, respuesta * delta);
     j.vy += (dy * velocidad - j.vy) * Math.min(1, respuesta * delta);
-    j.x = limitar(j.x + j.vx * delta, 24, ANCHO - 24);
+    j.x = limitar(j.x + j.vx * delta, LIMITE_JUGADOR.izquierda, LIMITE_JUGADOR.derecha);
     // Permite acercarse lo suficiente a la fila superior de contenedores.
-    j.y = limitar(j.y + j.vy * delta, 122, ALTO - 24);
+    j.y = limitar(j.y + j.vy * delta, LIMITE_JUGADOR.arriba, LIMITE_JUGADOR.abajo);
     j.energia = limitar(j.energia + (corriendo ? -34 : 20) * delta, 0, 100);
 
     if (corriendo && ajustes.particulas && Math.random() < delta * 12) {
         crearParticulas(j.x - j.dirX * 18, j.y - j.dirY * 18, "#e9e2bc", 1);
     }
 
-    if (red.modo === "solo") {
+    if (esModoLocal()) {
         if (!estado.llevando) {
             const indice = estado.residuos.findIndex((residuo) => distancia(j, residuo) < 39);
             if (indice >= 0) {
                 estado.llevando = estado.residuos.splice(indice, 1)[0];
-                tono(520, .06);
+                avanzarTutorial(1);
+                efectoSonido("recoger");
                 const riesgo = CONTAMINACION[estado.llevando.nivel];
                 mostrarMensaje(`${estado.llevando.icono} ${estado.llevando.nombre} · Nivel ${riesgo.marca} · ${riesgo.puntos} pts`, false);
             }
@@ -366,6 +421,7 @@ function actualizar(delta) {
             if (estado.boostRestante === 0) estado.boost = null;
         }
         estado.tiempo = Math.max(0, estado.tiempo - delta);
+        if (red.modo === "ecosistema") actualizarEcosistema(delta);
     }
     estado.particulas.forEach((p) => { p.x += p.vx * delta; p.y += p.vy * delta; p.vida -= delta; });
     estado.particulas = estado.particulas.filter((p) => p.vida > 0);
@@ -373,6 +429,28 @@ function actualizar(delta) {
     sincronizarJugador();
     if (estado.tiempo <= 0) terminar();
     actualizarHUD();
+}
+
+function actualizarEcosistema(delta) {
+    const eco = estado.ecosistema;
+    eco.agua = limitar(eco.agua - delta * .12, 0, 100);
+    eco.suelo = limitar(eco.suelo - delta * .1, 0, 100);
+    eco.vida = limitar(eco.vida - delta * .14, 0, 100);
+    if (Math.min(eco.agua, eco.suelo, eco.vida) <= 0) terminar(false, "ecosistema");
+}
+
+function impactoEcologico(categoria, nivel) {
+    const impactos = {
+        plastico: { agua: 8, suelo: 2, vida: 4 }, papel: { agua: 2, suelo: 7, vida: 5 },
+        vidrio: { agua: 6, suelo: 5, vida: 3 }, organico: { agua: 2, suelo: 9, vida: 7 },
+        metal: { agua: 7, suelo: 3, vida: 6 },
+    };
+    Object.entries(impactos[categoria]).forEach(([clave, valor]) => {
+        estado.ecosistema[clave] = limitar(estado.ecosistema[clave] + valor * (1 + (nivel - 1) * .25), 0, 100);
+    });
+    const minimo = Math.round(Math.min(...Object.values(estado.ecosistema)));
+    mostrarMensaje(`Cadena recuperada · el indicador más bajo está en ${minimo}%`, false);
+    if (Object.values(estado.ecosistema).every((valor) => valor >= ECO_META)) terminar(true, "ecosistema");
 }
 
 function procesarCaducidad(delta) {
@@ -403,7 +481,7 @@ function recibirDano(motivo) {
     estado.combo = 0;
     estado.sacudida = ajustes.sacudida ? 10 : 0;
     mostrarMensaje(`−1 corazón · ${motivo}`, true);
-    tono(110, .2);
+    efectoSonido("dano");
     if (estado.vida === 0) terminar(false, "sin-vida");
 }
 
@@ -434,12 +512,12 @@ function procesarAyudas(delta) {
     if (ayuda.tipo === "vida") {
         estado.vida = Math.min(estado.vidaMaxima, estado.vida + 1);
         mostrarMensaje("+1 corazón · Botiquín", false);
-        tono(720, .12);
+        efectoSonido("vida");
     } else {
         estado.boost = ayuda.tipo;
         estado.boostRestante = 8;
         mostrarMensaje(ayuda.tipo === "velocidad" ? "Impulso veloz · 8 segundos" : "Puntos dobles · 8 segundos", false);
-        tono(780, .12);
+        efectoSonido("potenciador");
     }
     crearParticulas(ayuda.x, ayuda.y, ayuda.tipo === "vida" ? "#b73d32" : "#f4c542", 14);
 }
@@ -452,7 +530,7 @@ function entregar(contenedor) {
         estado.puntos = Math.max(0, estado.puntos - 4);
         estado.sacudida = ajustes.sacudida ? 7 : 0;
         mostrarMensaje(`No: ${residuo.nombre} va en ${CATEGORIAS[residuo.categoria].nombre}`, true);
-        tono(145, .12);
+        efectoSonido("error");
         jRebote();
         return;
     }
@@ -468,16 +546,18 @@ function entregar(contenedor) {
     estado.combo += 1;
     estado.mejorCombo = Math.max(estado.mejorCombo, estado.combo);
     estado.llevando = null;
+    avanzarTutorial(2);
+    if (red.modo === "ecosistema") impactoEcologico(residuo.categoria, residuo.nivel);
     crearParticulas(contenedor.x, contenedor.y, residuo.dorado ? "#f4c542" : CATEGORIAS[residuo.categoria].color, residuo.dorado ? 18 : 10);
-    tono(residuo.dorado ? 760 : 610, .08);
+    efectoSonido(residuo.dorado ? "dorado" : estado.combo >= 3 ? "racha" : "acierto");
     mostrarMensaje(`${residuo.dorado ? "¡Hallazgo dorado! " : ""}+${ganados} · Contaminación ${contaminacion.nombre}`, false);
     avanzarMision();
 }
 
 function jRebote() {
     const j = estado.jugador;
-    j.x = limitar(j.x - j.dirX * 32, 24, ANCHO - 24);
-    j.y = limitar(j.y - j.dirY * 32, 122, ALTO - 24);
+    j.x = limitar(j.x - j.dirX * 32, LIMITE_JUGADOR.izquierda, LIMITE_JUGADOR.derecha);
+    j.y = limitar(j.y - j.dirY * 32, LIMITE_JUGADOR.arriba, LIMITE_JUGADOR.abajo);
 }
 
 function avanzarMision() {
@@ -498,7 +578,7 @@ function avanzarMision() {
     estado.tiempo = Math.min(DURACION, estado.tiempo + 12);
     for (let i = 0; i < 3; i += 1) crearResiduo();
     mostrarMensaje(`Etapa superada · +12 segundos`, false);
-    tono(820, .16);
+    efectoSonido("mision");
 }
 
 function crearParticulas(x, y, color, cantidad) {
@@ -510,20 +590,66 @@ function crearParticulas(x, y, color, cantidad) {
     }
 }
 
-function tono(frecuencia, duracion) {
-    if (!ajustes.sonido) return;
+function obtenerAudio() {
     try {
         audioCtx ||= new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === "suspended") audioCtx.resume();
+        return audioCtx;
+    } catch { return null; }
+}
+
+function tono(frecuencia, duracion, tipo = "sine", volumen = .05, retraso = 0) {
+    if (!ajustes.sonido || !obtenerAudio()) return;
+    try {
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
-        osc.type = "sine";
+        const inicio = audioCtx.currentTime + retraso;
+        osc.type = tipo;
         osc.frequency.value = frecuencia;
-        gain.gain.setValueAtTime(.05, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(.001, audioCtx.currentTime + duracion);
+        gain.gain.setValueAtTime(volumen, inicio);
+        gain.gain.exponentialRampToValueAtTime(.001, inicio + duracion);
         osc.connect(gain).connect(audioCtx.destination);
-        osc.start();
-        osc.stop(audioCtx.currentTime + duracion);
+        osc.start(inicio);
+        osc.stop(inicio + duracion);
     } catch { /* El juego continúa si Web Audio no está disponible. */ }
+}
+
+function efectoSonido(tipo) {
+    const efectos = {
+        recoger: [[440, .05, "triangle", .045, 0], [590, .07, "sine", .035, .04]],
+        acierto: [[523, .08, "triangle", .05, 0], [659, .1, "triangle", .04, .06]],
+        racha: [[523, .07, "triangle", .05, 0], [659, .08, "triangle", .045, .05], [784, .12, "sine", .04, .1]],
+        dorado: [[659, .08, "sine", .05, 0], [831, .1, "sine", .05, .06], [988, .16, "triangle", .04, .12]],
+        error: [[190, .12, "square", .035, 0], [145, .16, "sawtooth", .025, .08]],
+        dano: [[150, .15, "sawtooth", .04, 0], [95, .24, "square", .025, .1]],
+        vida: [[523, .09, "sine", .045, 0], [659, .1, "sine", .045, .07], [880, .15, "sine", .035, .14]],
+        potenciador: [[440, .07, "triangle", .04, 0], [660, .1, "triangle", .04, .05], [880, .14, "triangle", .035, .1]],
+        mision: [[392, .1, "triangle", .045, 0], [523, .12, "triangle", .045, .09], [659, .18, "sine", .04, .18]],
+    };
+    (efectos[tipo] || []).forEach((nota) => tono(...nota));
+}
+
+function iniciarMusica() {
+    detenerMusica();
+    if (!ajustes.musica || !estado.jugando || estado.pausado) return;
+    const melodia = [261.63, 329.63, 392, 329.63, 293.66, 349.23, 440, 349.23];
+    const tocarPaso = () => {
+        if (!ajustes.musica || !estado.jugando || estado.pausado) return;
+        const nota = melodia[pasoMusical % melodia.length];
+        const efectosActivos = ajustes.sonido;
+        ajustes.sonido = true;
+        tono(nota, .34, "triangle", .035);
+        if (pasoMusical % 2 === 0) tono(nota / 2, .42, "sine", .022);
+        ajustes.sonido = efectosActivos;
+        pasoMusical += 1;
+        musicaTimer = setTimeout(tocarPaso, 430);
+    };
+    tocarPaso();
+}
+
+function detenerMusica() {
+    clearTimeout(musicaTimer);
+    musicaTimer = null;
 }
 
 function mostrarMensaje(texto, negativo) {
@@ -548,7 +674,7 @@ function actualizarHUD() {
     ui.objeto.textContent = estado.llevando ? `${estado.llevando.icono} ${estado.llevando.nombre}` : "Manos libres";
     ui.energia.style.width = `${estado.jugador.energia}%`;
     ui.energiaMeter.setAttribute("aria-valuenow", Math.round(estado.jugador.energia));
-    ui.mision.textContent = mision.nombre;
+    ui.mision.textContent = red.modo === "ecosistema" ? "Equilibra la cadena ecológica" : mision.nombre;
     ui.misionProgreso.textContent = `${progreso} / ${mision.objetivo}`;
     ui.misionEtapa.textContent = `Etapa ${estado.mision + 1} de ${MISIONES.length}`;
     ui.progreso.style.width = `${(progreso / mision.objetivo) * 100}%`;
@@ -560,6 +686,11 @@ function actualizarHUD() {
         $("#hud-boost-texto").textContent = `${estado.boost === "velocidad" ? "⚡ Velocidad" : "★ Puntos ×2"} · ${Math.ceil(estado.boostRestante)}s`;
     }
     ui.tiempo.closest(".hud-dato").classList.toggle("urgente", estado.tiempo < 15);
+    $("#panel-ecosistema").classList.toggle("oculto", red.modo !== "ecosistema");
+    Object.entries(estado.ecosistema).forEach(([clave, valor]) => {
+        $(`#eco-${clave}`).value = valor;
+        $(`#eco-${clave}-valor`).textContent = Math.round(valor);
+    });
 }
 
 function dibujar() {
@@ -574,36 +705,110 @@ function dibujar() {
         .forEach((jugador) => dibujarJugadorRemoto(jugador));
     dibujarJugador();
     dibujarParticulas();
+    dibujarPrimerPlanoParque();
     ctx.restore();
 }
 
 function dibujarParque() {
-    const cielo = ctx.createLinearGradient(0, 0, 0, ALTO);
-    cielo.addColorStop(0, "#b9d99c");
-    cielo.addColorStop(1, "#8fc17e");
-    ctx.fillStyle = cielo;
+    const cesped = ctx.createLinearGradient(0, 0, 0, ALTO);
+    cesped.addColorStop(0, "#b8dc91");
+    cesped.addColorStop(.48, "#94c97c");
+    cesped.addColorStop(1, "#78b56d");
+    ctx.fillStyle = cesped;
     ctx.fillRect(0, 0, ANCHO, ALTO);
-    ctx.fillStyle = "#d9c48e";
+
+    ctx.fillStyle = "#dce9c4";
+    ctx.fillRect(0, 0, ANCHO, 130);
+    const luzLejana = ctx.createLinearGradient(0, 22, 0, 150);
+    luzLejana.addColorStop(0, "rgba(255,255,255,.42)");
+    luzLejana.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = luzLejana;
+    ctx.fillRect(0, 22, ANCHO, 145);
+    ctx.fillStyle = "rgba(23,63,53,.1)";
+    for (let x = 0; x < ANCHO; x += 32) ctx.fillRect(x, 118 + (x % 64 ? 4 : 0), 22, 4);
+    ctx.fillStyle = "#173f35";
+    ctx.font = "700 11px 'Atkinson Hyperlegible'";
+    ctx.textAlign = "left";
+    ctx.fillText("PUNTO LIMPIO DEL BARRIO", 18, 21);
+
+    ctx.strokeStyle = "rgba(92,68,38,.3)";
+    ctx.lineWidth = 238;
+    ctx.lineCap = "round";
     ctx.beginPath();
-    ctx.moveTo(405, 120); ctx.bezierCurveTo(360, 260, 440, 360, 350, 600);
-    ctx.lineTo(610, 600); ctx.bezierCurveTo(550, 370, 620, 260, 555, 120);
-    ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = "rgba(55,112,61,.2)";
+    ctx.moveTo(487, 119); ctx.bezierCurveTo(417, 245, 572, 360, 477, 640); ctx.stroke();
+    ctx.strokeStyle = "#b09b6a";
+    ctx.lineWidth = 228;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(480, 118); ctx.bezierCurveTo(410, 245, 565, 360, 470, 640); ctx.stroke();
+    ctx.strokeStyle = "#e1ce99";
+    ctx.lineWidth = 210;
+    ctx.beginPath();
+    ctx.moveTo(480, 118); ctx.bezierCurveTo(410, 245, 565, 360, 470, 640); ctx.stroke();
+    ctx.lineCap = "butt";
+
+    ctx.fillStyle = "rgba(101,77,43,.16)";
+    [[430,185,9,4],[512,232,12,5],[452,290,8,4],[536,350,11,5],[430,415,10,4],[505,482,9,4],[405,550,12,5]].forEach(([x,y,rx,ry]) => {
+        ctx.beginPath(); ctx.ellipse(x,y,rx,ry,-.2,0,Math.PI*2); ctx.fill();
+    });
+
+    ctx.strokeStyle = "rgba(38,96,73,.22)";
     ctx.lineWidth = 2;
-    for (let x = 20; x < ANCHO; x += 48) {
-        for (let y = 160 + (x % 90); y < ALTO; y += 95) {
-            ctx.beginPath(); ctx.moveTo(x, y + 7); ctx.quadraticCurveTo(x - 5, y, x - 2, y - 7);
-            ctx.moveTo(x, y + 7); ctx.quadraticCurveTo(x + 6, y, x + 4, y - 8); ctx.stroke();
+    for (let x = 24; x < ANCHO; x += 54) {
+        for (let y = 160 + (x % 76); y < ALTO; y += 88) {
+            if (x > 330 && x < 635) continue;
+            ctx.beginPath(); ctx.moveTo(x, y + 7); ctx.quadraticCurveTo(x - 6, y, x - 2, y - 8);
+            ctx.moveTo(x, y + 7); ctx.quadraticCurveTo(x + 7, y, x + 4, y - 9); ctx.stroke();
         }
     }
-    dibujarArbusto(35, 180, 1.1); dibujarArbusto(920, 205, 1.2);
-    dibujarArbusto(70, 510, .9); dibujarArbusto(885, 505, 1);
-    ctx.fillStyle = "rgba(255,255,255,.52)";
-    ctx.fillRect(0, 132, ANCHO, 3);
+
+    dibujarArbol(30, 236, 1.05); dibujarArbol(918, 245, 1.12);
+    dibujarArbol(54, 520, .9); dibujarArbol(907, 520, 1.02);
+    dibujarArbusto(132, 174, .78); dibujarArbusto(830, 175, .82);
+    dibujarArbusto(205, 525, .8); dibujarArbusto(765, 535, .75);
+    dibujarBanco(190, 285); dibujarCartel(744, 238);
+
+    [[115,360,"#f4c542"],[845,350,"#f7e8d1"],[250,430,"#dc5942"],[705,450,"#6f5aa5"]].forEach(([x,y,color]) => {
+        ctx.fillStyle = color;
+        for (let a=0;a<Math.PI*2;a+=Math.PI/2) { ctx.beginPath(); ctx.arc(x+Math.cos(a)*5,y+Math.sin(a)*5,4,0,Math.PI*2); ctx.fill(); }
+        ctx.fillStyle="#f4c542"; ctx.beginPath(); ctx.arc(x,y,3,0,Math.PI*2); ctx.fill();
+    });
+}
+
+function dibujarArbol(x, y, escala) {
+    ctx.save(); ctx.translate(x,y); ctx.scale(escala,escala);
+    ctx.fillStyle = "rgba(16,47,43,.2)"; ctx.beginPath(); ctx.ellipse(4,32,42,13,-.15,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = "#855832"; ctx.fillRect(-8,-12,16,52);
+    ctx.fillStyle = "#245f43";
+    [[0,-32,38],[-28,-18,29],[29,-16,31],[2,-61,30]].forEach(([cx,cy,r]) => { ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.fill(); });
+    ctx.fillStyle = "#4d8a4e";
+    [[-17,-45,16],[20,-39,18],[2,-68,15]].forEach(([cx,cy,r]) => { ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.fill(); });
+    ctx.restore();
+}
+
+function dibujarBanco(x, y) {
+    ctx.save(); ctx.translate(x,y); ctx.fillStyle="rgba(16,47,43,.17)";ctx.beginPath();ctx.ellipse(0,20,54,10,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle="#70462e";ctx.fillRect(-48,-8,96,12);ctx.fillRect(-45,9,90,10);ctx.fillRect(-35,18,7,18);ctx.fillRect(28,18,7,18);
+    ctx.strokeStyle="#173f35";ctx.lineWidth=3;ctx.strokeRect(-48,-8,96,12);ctx.restore();
+}
+
+function dibujarCartel(x, y) {
+    ctx.save();ctx.translate(x,y);ctx.fillStyle="rgba(16,47,43,.15)";ctx.beginPath();ctx.ellipse(0,38,35,8,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle="#795033";ctx.fillRect(-5,-2,10,42);ctx.fillStyle="#fff3cf";ctx.strokeStyle="#173f35";ctx.lineWidth=3;rectRedondo(-51,-34,102,38,8);ctx.fill();ctx.stroke();
+    ctx.fillStyle="#173f35";ctx.textAlign="center";ctx.font="700 11px 'Atkinson Hyperlegible'";ctx.fillText("CLASIFICA",0,-18);ctx.fillText("Y SUMA",0,-6);ctx.restore();
+}
+
+function dibujarPrimerPlanoParque() {
+    ctx.save(); ctx.fillStyle = "#1b513b";
+    [[-8,590,40],[25,612,34],[938,600,38],[973,577,35]].forEach(([x,y,r]) => { ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill(); });
+    ctx.fillStyle = "#3f7b49";
+    [[20,585,20],[948,574,19]].forEach(([x,y,r]) => { ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill(); });
+    ctx.restore();
 }
 
 function dibujarArbusto(x, y, escala) {
     ctx.save(); ctx.translate(x, y); ctx.scale(escala, escala);
+    ctx.fillStyle = "rgba(16,47,43,.16)"; ctx.beginPath(); ctx.ellipse(0,17,31,9,0,0,Math.PI*2); ctx.fill();
     ctx.fillStyle = "#397446";
     [[0,0,23],[18,5,18],[-17,7,17]].forEach(([cx,cy,r]) => { ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill(); });
     ctx.fillStyle = "#f4c542";
@@ -616,28 +821,38 @@ function dibujarContenedores() {
         const cat = CATEGORIAS[c.categoria];
         const cerca = estado.llevando && distancia(estado.jugador, c) < 100;
         ctx.save(); ctx.translate(c.x, c.y);
-        if (cerca) { ctx.strokeStyle = estado.llevando.categoria === c.categoria ? "#fff8cf" : "#b9382d"; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(0, 0, 52, 0, Math.PI * 2); ctx.stroke(); }
-        ctx.fillStyle = "rgba(23,51,45,.18)"; ctx.beginPath(); ctx.ellipse(0, 39, 39, 10, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = cat.color; rectRedondo(-34, -30, 68, 70, 10); ctx.fill();
-        ctx.fillStyle = "#17332d"; rectRedondo(-38, -35, 76, 14, 6); ctx.fill();
-        ctx.fillStyle = "#fffaf0"; ctx.font = "700 22px 'Atkinson Hyperlegible'"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(cat.simbolo, 0, 2);
-        ctx.fillStyle = "#17332d"; ctx.font = "700 13px 'Atkinson Hyperlegible'"; ctx.fillText(cat.corto, 0, 55);
+        if (cerca) {
+            const correcto = estado.llevando.categoria === c.categoria;
+            ctx.fillStyle = correcto ? "rgba(244,197,66,.3)" : "rgba(220,89,66,.24)";
+            ctx.beginPath(); ctx.arc(0, 2, 54, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = correcto ? "#f4c542" : "#dc5942"; ctx.lineWidth = 4;
+            ctx.beginPath(); ctx.arc(0, 2, 50, 0, Math.PI * 2); ctx.stroke();
+        }
+        ctx.fillStyle = "rgba(23,51,45,.2)"; ctx.beginPath(); ctx.ellipse(3, 38, 40, 10, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "#17332d"; rectRedondo(-38, -34, 76, 74, 11); ctx.fill();
+        ctx.fillStyle = cat.color; rectRedondo(-33, -29, 66, 64, 8); ctx.fill();
+        ctx.fillStyle = "rgba(255,255,255,.24)"; rectRedondo(-27, -24, 10, 52, 5); ctx.fill();
+        ctx.fillStyle = "#17332d"; rectRedondo(-40, -38, 80, 15, 6); ctx.fill();
+        ctx.fillStyle = "#fffaf0"; ctx.font = "700 21px 'Atkinson Hyperlegible'"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(cat.simbolo, 0, 1);
+        ctx.fillStyle = "#fffaf0"; rectRedondo(-28, 19, 56, 13, 4); ctx.fill();
+        ctx.fillStyle = "#17332d"; ctx.font = "700 10px 'Atkinson Hyperlegible'"; ctx.fillText(cat.corto, 0, 26);
         ctx.restore();
     });
 }
 
 function dibujarResiduos() {
-    const ahora = performance.now() / 1000;
+    const ahora = movimientoReducido ? 0 : performance.now() / 1000;
     estado.residuos.forEach((r) => {
         const flotacion = Math.sin(ahora * 3 + r.pulso) * 3;
         const contaminacion = CONTAMINACION[r.nivel];
         const urgente = r.vida <= 3;
         ctx.save(); ctx.translate(r.x, r.y + flotacion);
-        ctx.fillStyle = "rgba(23,51,45,.18)"; ctx.beginPath(); ctx.ellipse(0, 18, 20, 7, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "rgba(23,51,45,.2)"; ctx.beginPath(); ctx.ellipse(2, 20, 22, 7, 0, 0, Math.PI * 2); ctx.fill();
         if (r.dorado) {
             ctx.strokeStyle = "#f4c542"; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(0, 0, 25 + Math.sin(ahora * 5) * 2, 0, Math.PI * 2); ctx.stroke();
         }
-        ctx.fillStyle = "#fffaf0"; ctx.beginPath(); ctx.arc(0, 0, 22, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "#173f35"; ctx.beginPath(); ctx.arc(0, 0, 25, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "#fffaf0"; ctx.beginPath(); ctx.arc(0, 0, 21, 0, Math.PI * 2); ctx.fill();
         ctx.strokeStyle = contaminacion.color;
         ctx.lineWidth = urgente ? 5 : 3;
         ctx.globalAlpha = urgente ? .55 + Math.sin(ahora * 12) * .35 : 1;
@@ -677,18 +892,39 @@ function dibujarAyudas() {
 
 function dibujarJugador() {
     const j = estado.jugador;
+    // Segunda barrera de seguridad: evita que estados antiguos o sincronizados
+    // lleguen al render fuera del área visible del parque.
+    j.x = limitar(j.x, LIMITE_JUGADOR.izquierda, LIMITE_JUGADOR.derecha);
+    j.y = limitar(j.y, LIMITE_JUGADOR.arriba, LIMITE_JUGADOR.abajo);
     const andando = Math.hypot(j.vx, j.vy) > 20;
-    const paso = andando ? Math.sin(performance.now() / 75) * 2 : 0;
-    ctx.save(); ctx.translate(j.x, j.y + paso);
-    ctx.fillStyle = "rgba(23,51,45,.22)"; ctx.beginPath(); ctx.ellipse(0, 20 - paso, 20, 7, 0, 0, Math.PI * 2); ctx.fill();
+    const ahora = movimientoReducido ? 0 : performance.now();
+    const paso = andando ? Math.sin(ahora / 72) * 5 : Math.sin(ahora / 520) * 1.4;
+    const respiracion = andando ? 1 : 1 + Math.sin(ahora / 520) * .025;
+    const parpadea = !movimientoReducido && ahora % 3200 > 3070;
+    ctx.save(); ctx.translate(j.x, j.y + paso); ctx.scale(ESCALA_JUGADOR, ESCALA_JUGADOR);
+    ctx.fillStyle = "rgba(16,47,43,.3)"; ctx.beginPath(); ctx.ellipse(4, 29 - paso, andando ? 29 : 24, andando ? 10 : 8, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.scale(1, respiracion);
     const aspecto = PERSONAJES[estado.personaje] || PERSONAJES.exploradora;
-    ctx.fillStyle = aspecto.piel; ctx.beginPath(); ctx.arc(0, -8, 13, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = aspecto.camiseta; rectRedondo(-17, 1, 34, 31, 12); ctx.fill();
+    ctx.strokeStyle = "#17332d"; ctx.lineWidth = 4; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(-7,22); ctx.lineTo(-10,34 + paso); ctx.moveTo(7,22); ctx.lineTo(10,34 - paso); ctx.stroke();
+    ctx.fillStyle = "#5a4030"; ctx.beginPath(); ctx.arc(-10,34+paso,4,0,Math.PI*2);ctx.arc(10,34-paso,4,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle = "#e0a744"; rectRedondo(-22,-1,11,25,5); ctx.fill();
+    const camiseta = ctx.createLinearGradient(-17, 0, 18, 26);
+    camiseta.addColorStop(0, aspecto.camiseta);
+    camiseta.addColorStop(.68, aspecto.camiseta);
+    camiseta.addColorStop(1, "#173f35");
+    ctx.fillStyle = camiseta; ctx.strokeStyle="#17332d";ctx.lineWidth=3;rectRedondo(-17, 0, 34, 29, 10); ctx.fill();ctx.stroke();
+    const brazo = andando ? Math.sin(ahora / 72) * 7 : Math.sin(ahora / 650) * 1.5;
+    ctx.strokeStyle = aspecto.piel; ctx.lineWidth=6;ctx.beginPath();ctx.moveTo(-14,8);ctx.lineTo(-21,18+brazo);ctx.moveTo(14,8);ctx.lineTo(21,18-brazo);ctx.stroke();
+    ctx.fillStyle = aspecto.piel; ctx.strokeStyle="#17332d";ctx.lineWidth=3;ctx.beginPath();ctx.arc(0,-10,14,0,Math.PI*2);ctx.fill();ctx.stroke();
     ctx.fillStyle = aspecto.pelo;
-    ctx.beginPath(); ctx.arc(-1, -13, 16, Math.PI, aspecto.peloLargo ? Math.PI * 2.2 : Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(-1, -15, 16, Math.PI, aspecto.peloLargo ? Math.PI * 2.2 : Math.PI * 2); ctx.fill();
     if (aspecto.peloLargo) { ctx.fillRect(-16, -13, 5, 24); ctx.fillRect(11, -13, 5, 24); }
     ctx.fillStyle = "#17332d";
-    ctx.beginPath(); ctx.arc(-5, -7, 1.5, 0, Math.PI * 2); ctx.arc(5, -7, 1.5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath();
+    if (parpadea) { ctx.fillRect(-7,-9,4,1); ctx.fillRect(3,-9,4,1); }
+    else { ctx.arc(-5, -9, 1.5, 0, Math.PI * 2); ctx.arc(5, -9, 1.5, 0, Math.PI * 2); }
+    ctx.fill();
     if (estado.llevando) {
         ctx.fillStyle = estado.llevando.dorado ? "#f4c542" : "#fffaf0"; ctx.beginPath(); ctx.arc(0, -38, 17, 0, Math.PI * 2); ctx.fill();
         ctx.font = "20px serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(estado.llevando.icono, 0, -38);
@@ -700,17 +936,23 @@ function dibujarJugadorRemoto(jugador) {
     const antiguedad = Math.max(0, Math.min(150,
         Date.now() + red.desfaseServidor - (jugador.actualizacion_ms || Date.now())
     )) / 1000;
-    const objetivoX = limitar(jugador.x + (jugador.vx || 0) * antiguedad, 0, 960);
-    const objetivoY = limitar(jugador.y + (jugador.vy || 0) * antiguedad, 0, 600);
+    const objetivoX = limitar(jugador.x + (jugador.vx || 0) * antiguedad, LIMITE_JUGADOR.izquierda, LIMITE_JUGADOR.derecha);
+    const objetivoY = limitar(jugador.y + (jugador.vy || 0) * antiguedad, LIMITE_JUGADOR.arriba, LIMITE_JUGADOR.abajo);
     const anterior = red.suavizados[jugador.id] || { x: objetivoX, y: objetivoY };
     anterior.x += (objetivoX - anterior.x) * .28;
     anterior.y += (objetivoY - anterior.y) * .28;
+    anterior.x = limitar(anterior.x, LIMITE_JUGADOR.izquierda, LIMITE_JUGADOR.derecha);
+    anterior.y = limitar(anterior.y, LIMITE_JUGADOR.arriba, LIMITE_JUGADOR.abajo);
     red.suavizados[jugador.id] = anterior;
     const aspecto = PERSONAJES[jugador.personaje] || PERSONAJES.guardaparque;
+    const andando = Math.hypot(jugador.vx || 0, jugador.vy || 0) > 20;
+    const paso = !movimientoReducido && andando ? Math.sin(performance.now() / 78 + jugador.id.length) * 4 : 0;
     ctx.save();
     ctx.globalAlpha = .88;
-    ctx.translate(anterior.x, anterior.y);
+    ctx.translate(anterior.x, anterior.y + paso);
+    ctx.scale(ESCALA_JUGADOR, ESCALA_JUGADOR);
     ctx.fillStyle = "rgba(23,51,45,.2)"; ctx.beginPath(); ctx.ellipse(0, 20, 20, 7, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "#17332d"; ctx.lineWidth = 4; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(-7,22); ctx.lineTo(-10,34+paso); ctx.moveTo(7,22); ctx.lineTo(10,34-paso); ctx.stroke();
     ctx.fillStyle = aspecto.camiseta; rectRedondo(-17, 1, 34, 31, 12); ctx.fill();
     ctx.fillStyle = aspecto.piel; ctx.beginPath(); ctx.arc(0, -8, 13, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = aspecto.pelo; ctx.beginPath(); ctx.arc(0, -13, 16, Math.PI, Math.PI * 2); ctx.fill();
@@ -744,6 +986,7 @@ function bucle(timestamp) {
 function terminar(completado = false, causa = "tiempo") {
     if (!estado.jugando) return;
     estado.jugando = false;
+    detenerMusica();
     const intentos = estado.entregas + estado.errores;
     const precision = intentos ? Math.round((estado.entregas / intentos) * 100) : 0;
     $("#final-puntos").textContent = estado.puntos.toLocaleString("es");
@@ -758,11 +1001,44 @@ function terminar(completado = false, causa = "tiempo") {
     $("#final-reto").textContent = causa === "sin-vida"
         ? "Próximo reto: prioriza los residuos con marca II y III antes de que expiren."
         : precision < 80 ? "Próximo reto: supera el 80% de precisión." : estado.mejorCombo < 6 ? "Próximo reto: encadena 6 entregas correctas." : "Próximo reto: completa la patrulla con más tiempo restante.";
-    mostrarPantalla(ui.final);
-    tono(completado ? 880 : 420, .25);
-    if (red.modo !== "solo") enviarEstadoRed(true);
-    guardarPuntuacion();
+    if (completado) efectoSonido("mision"); else tono(420, .25);
+    if (!esModoLocal()) enviarEstadoRed(true);
+    Campania.registrarParque(estado.puntos, estado.reciclados);
 }
+
+function mostrarResultadoVersus() {
+    const panel = $("#final-versus");
+    if (Campania.modo !== "versus" || red.jugadores.length < 2) {
+        panel.classList.add("oculto");
+        return;
+    }
+    const clasificacion = [...red.jugadores].sort((a, b) => b.puntos - a.puntos);
+    const mejorPuntaje = clasificacion[0].puntos;
+    const ganadores = clasificacion.filter((jugador) => jugador.puntos === mejorPuntaje);
+    const propio = clasificacion.find((jugador) => jugador.id === red.jugadorId);
+    const posicion = clasificacion.findIndex((jugador) => jugador.id === red.jugadorId) + 1;
+    const empate = ganadores.length > 1;
+    const nombresGanadores = ganadores.map((jugador) => jugador.nombre).join(" y ");
+    $("#titulo-final").textContent = empate ? "¡El versus terminó en empate!" : `¡${nombresGanadores} gana el versus!`;
+    panel.textContent = `${empate ? "Empate" : "Ganador"}: ${nombresGanadores} con ${mejorPuntaje} puntos · Tu resultado: ${propio?.puntos || 0} puntos, posición ${posicion} de ${clasificacion.length}.`;
+    panel.classList.remove("oculto");
+    if (propio && ganadores.some((jugador) => jugador.id === propio.id)) $("#medalla-final").textContent = "🏆";
+}
+
+window.mostrarFinalCampania = function mostrarFinalCampania(correctas) {
+    document.body.classList.remove("en-campania");
+    const total = Campania.total();
+    $("#final-puntos").textContent = total.toLocaleString("es");
+    $("#titulo-final").textContent = "¡Misión ecológica completada!";
+    $("#final-resumen").textContent = `${Campania.nombre}, recorriste las cuatro etapas y acertaste ${correctas} de 3 preguntas.`;
+    $("#final-reto").textContent = correctas === 3 ? "Dominas las decisiones esenciales. Ahora llévalas a tu casa y comunidad." : "Cada pequeño hábito cuenta: clasifica, repara fugas y apaga lo que no utilizas.";
+    $("#medalla-final").textContent = correctas === 3 ? "🏆" : "🌍";
+    mostrarResultadoVersus();
+    const nombres = { reciclaje: "Parque", agua: "Llaves", energia: "Casa", reforestacion: "Bosque" };
+    const desglose = $("#desglose-etapas"); desglose.replaceChildren();
+    Object.entries(Campania.puntos).forEach(([clave, puntos]) => { const item = document.createElement("div"); item.innerHTML = `<span>${nombres[clave]}</span><strong>${puntos} pts</strong>`; desglose.appendChild(item); });
+    mostrarPantalla(ui.final); cargarRanking();
+};
 
 async function guardarPuntuacion() {
     try {
@@ -892,11 +1168,16 @@ async function consultarSala() {
             item.textContent = `${PERSONAJES[jugador.personaje]?.nombre || "Jugador"} · ${jugador.nombre}`;
             return item;
         }));
-        const completa = sala.jugadores.length === 2;
-        $("#sala-estado").textContent = completa
-            ? (red.anfitrion ? "La patrulla está lista." : "Esperando que el anfitrión inicie…")
-            : "Esperando al segundo jugador…";
-        $("#iniciar-sala").classList.toggle("oculto", !red.anfitrion || !completa || sala.estado === "jugando");
+        const minimo = sala.min_jugadores || 2;
+        const maximo = sala.max_jugadores || 10;
+        const puedeIniciar = sala.jugadores.length >= minimo;
+        const cupos = `${sala.jugadores.length}/${maximo} jugadores`;
+        $("#sala-estado").textContent = puedeIniciar
+            ? (red.anfitrion
+                ? `${cupos} · Puedes iniciar o esperar a más personas.`
+                : `${cupos} · Esperando que el anfitrión inicie…`)
+            : `${cupos} · Esperando al menos a otra persona…`;
+        $("#iniciar-sala").classList.toggle("oculto", !red.anfitrion || !puedeIniciar || sala.estado === "jugando");
         actualizarMarcadorRed();
         if (sala.estado === "jugando") comenzarDesdeSala(sala);
     } catch (error) {
@@ -919,7 +1200,7 @@ async function iniciarSala() {
 }
 
 function sincronizarJugador() {
-    if (red.modo === "solo" || red.enviando || performance.now() - red.envioAnterior < 55) return;
+    if (esModoLocal() || red.enviando || performance.now() - red.envioAnterior < 55) return;
     red.envioAnterior = performance.now();
     enviarEstadoRed(false);
 }
@@ -983,7 +1264,7 @@ function aplicarEstadoCompartido(sala) {
 }
 
 function actualizarMarcadorRed() {
-    if (red.modo === "solo" || !red.jugadores.length) return;
+    if (esModoLocal() || !red.jugadores.length) return;
     const propio = red.jugadores.find((j) => j.id === red.jugadorId);
     const rival = red.jugadores.find((j) => j.id !== red.jugadorId);
     if (red.modo === "cooperativo") {
@@ -999,12 +1280,16 @@ ui.form.addEventListener("submit", (evento) => {
     evento.preventDefault();
     red.modo = document.querySelector('input[name="modo"]:checked').value;
     red.partidaIniciada = false;
-    if (red.modo === "solo") {
+    if (esModoLocal()) {
         $("#hud-red").classList.add("oculto");
         comenzar();
     } else {
         configurarSalaVisible();
     }
+});
+$("#tutorial-omitir").addEventListener("click", () => {
+    estado.tutorialPaso = PASOS_TUTORIAL.length;
+    actualizarTutorial();
 });
 $("#crear-sala").addEventListener("click", crearSala);
 $("#form-unirse").addEventListener("submit", unirseSala);
@@ -1024,6 +1309,7 @@ $("#boton-jugar-de-nuevo").addEventListener("click", () => {
 });
 $("#boton-inicio").addEventListener("click", () => {
     desconectarSala();
+    document.body.classList.remove("en-campania");
     mostrarPantalla(ui.inicio);
     ui.nombre.focus();
     cargarRanking();
@@ -1032,7 +1318,9 @@ $("#boton-pausa").addEventListener("click", alternarPausa);
 $("#boton-continuar").addEventListener("click", alternarPausa);
 $("#boton-salir").addEventListener("click", () => {
     estado.jugando = false; estado.pausado = false; ui.pausa.classList.add("oculto");
+    detenerMusica();
     desconectarSala();
+    document.body.classList.remove("en-campania");
     mostrarPantalla(ui.inicio);
 });
 
@@ -1040,6 +1328,7 @@ const dialogo = $("#dialogo-ajustes");
 $("#boton-ajustes").addEventListener("click", () => dialogo.showModal());
 [
     ["#ajuste-sonido", "sonido"],
+    ["#ajuste-musica", "musica"],
     ["#ajuste-particulas", "particulas"],
     ["#ajuste-sacudida", "sacudida"],
     ["#ajuste-contraste", "contraste"],
@@ -1048,6 +1337,9 @@ $("#boton-ajustes").addEventListener("click", () => dialogo.showModal());
     control.checked = ajustes[clave];
     control.addEventListener("change", () => {
         ajustes[clave] = control.checked;
+        if (clave === "musica") {
+            if (ajustes.musica) iniciarMusica(); else detenerMusica();
+        }
         document.body.classList.toggle("alto-contraste", ajustes.contraste);
         guardarAjustes();
     });
@@ -1057,3 +1349,4 @@ dialogo.addEventListener("close", () => $("#boton-ajustes").focus());
 
 cargarRanking();
 dibujar();
+window.addEventListener("resize", configurarResolucionCanvas);

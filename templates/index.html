@@ -15,16 +15,25 @@
         <header class="cabecera">
             <a class="marca" href="/" aria-label="EcoRecicla, inicio">
                 <span class="marca-hoja" aria-hidden="true">♻</span>
-                <span>EcoRecicla</span>
+                <span class="marca-copy"><strong>EcoRecicla</strong><small>La ruta del cambio</small></span>
             </a>
-            <button id="boton-ajustes" class="boton-icono" type="button" aria-label="Abrir ajustes">⚙</button>
+            <div class="cabecera-acciones"><span class="cabecera-insignia">Aventura ecológica</span><button id="boton-ajustes" class="boton-icono" type="button" aria-label="Abrir ajustes">⚙</button></div>
         </header>
 
         <section id="pantalla-inicio" class="pantalla inicio" aria-labelledby="titulo-inicio">
             <div class="hero">
-                <p class="ceja">Patrulla verde · Rescate contrarreloj</p>
-                <h1 id="titulo-inicio">El parque te necesita.</h1>
-                <p class="entradilla">Recoge, clasifica y encadena aciertos. Cada entrega recupera un rincón del parque, pero la basura no deja de llegar.</p>
+                <p class="ceja">Una aventura · cuatro etapas</p>
+                <h1 id="titulo-inicio">La misión empieza <span>en tu barrio.</span></h1>
+                <p class="entradilla">Recorre el parque, repara llaves de agua, apaga las luces de una casa y devuelve árboles al bosque. Tus puntos viajarán contigo hasta el final.</p>
+
+                <div class="hero-sello" aria-label="Cuatro mundos, una sola misión"><strong>4</strong><span>Mundos<small>Una sola misión</small></span></div>
+
+                <ol class="mapa-etapas" aria-label="Recorrido de la aventura">
+                    <li><b>1</b><em aria-hidden="true">♻</em><span>Parque<small>Recicla</small></span></li>
+                    <li><b>2</b><em aria-hidden="true">💧</em><span>Plaza<small>Cuida el agua</small></span></li>
+                    <li><b>3</b><em aria-hidden="true">💡</em><span>Casa<small>Apaga las luces</small></span></li>
+                    <li><b>4</b><em aria-hidden="true">🌳</em><span>Bosque<small>Reforesta</small></span></li>
+                </ol>
 
                 <div class="como-jugar" aria-label="Cómo jugar">
                     <div><strong>1</strong><span>Busca un residuo</span></div>
@@ -62,13 +71,13 @@
                     </fieldset>
 
                     <fieldset class="selector-modo">
-                        <legend>¿Cómo quieres jugar?</legend>
-                        <label><input type="radio" name="modo" value="solo" checked><span><strong>En solitario</strong><small>Tu propia patrulla</small></span></label>
+                        <legend>¿Cómo quieren afrontar la aventura?</legend>
+                        <label><input type="radio" name="modo" value="solo" checked><span><strong>Aventura individual</strong><small>Completa las cuatro etapas</small></span></label>
                         <label><input type="radio" name="modo" value="cooperativo"><span><strong>Cooperativo local</strong><small>Sumen puntos en equipo</small></span></label>
                         <label><input type="radio" name="modo" value="versus"><span><strong>Versus local</strong><small>Compitan por el récord</small></span></label>
                     </fieldset>
 
-                    <button class="boton-principal boton-iniciar" type="submit">Continuar <span aria-hidden="true">→</span></button>
+                    <button class="boton-principal boton-iniciar" type="submit"><span>Comenzar aventura</span><i aria-hidden="true">→</i></button>
                 </form>
 
                 <section id="panel-sala" class="panel-sala oculto" aria-labelledby="titulo-sala">
@@ -85,10 +94,10 @@
                         </form>
                     </div>
                     <div id="sala-espera" class="sala-espera oculto">
-                        <p>Comparte este código con la otra persona:</p>
+                        <p>Comparte este código con hasta nueve personas:</p>
                         <output id="sala-codigo" aria-label="Código de la sala">----</output>
                         <ul id="sala-jugadores" aria-live="polite"></ul>
-                        <p id="sala-estado" role="status">Esperando al segundo jugador…</p>
+                        <p id="sala-estado" role="status">Esperando al menos a otra persona…</p>
                         <button id="iniciar-sala" class="boton-principal oculto" type="button">Iniciar para ambos</button>
                     </div>
                     <p id="sala-error" class="error-sala oculto" role="alert"></p>
@@ -108,8 +117,57 @@
             </aside>
         </section>
 
+        <section id="pantalla-minijuego" class="pantalla minijuego oculto" aria-labelledby="mini-titulo">
+            <nav class="ruta-compacta" aria-label="Progreso de etapas"><span id="mini-etapa">Etapa 2 de 4</span><div><i></i></div><strong id="mini-total">Total: 0 pts</strong></nav>
+            <header class="mini-cabecera">
+                <div><p id="mini-ceja" class="ceja">Módulo jugable</p><h1 id="mini-titulo">Cierra el grifo</h1><p id="mini-instruccion"></p></div>
+                <div class="mini-marcadores"><span><small>Tiempo</small><strong id="mini-tiempo">90</strong></span><span><small>Puntos</small><strong id="mini-puntos">0</strong></span></div>
+            </header>
+            <div class="mini-area">
+                <canvas id="canvas-mini" width="960" height="560" aria-label="Minijuego ecológico interactivo"></canvas>
+                <div id="mini-mensaje" class="mini-mensaje oculto" role="status" aria-live="polite"></div>
+                <section id="mini-tutorial" class="mini-tutorial oculto" aria-labelledby="mini-tutorial-titulo">
+                    <p class="ceja">Antes de comenzar</p>
+                    <h2 id="mini-tutorial-titulo">Tu misión</h2>
+                    <p id="mini-tutorial-texto"></p>
+                    <strong id="mini-tutorial-control"></strong>
+                    <button id="mini-empezar" class="boton-principal" type="button">Empezar · 1:30</button>
+                </section>
+            </div>
+            <div id="mini-herramientas" class="mini-herramientas" aria-label="Herramientas del minijuego"></div>
+            <footer class="mini-pie"><p id="mini-impacto">Impacto ambiental</p><button id="mini-salir" class="boton-secundario" type="button">Abandonar aventura</button></footer>
+        </section>
+
+        <section id="pantalla-cuestionario" class="pantalla cuestionario oculto" aria-labelledby="titulo-cuestionario">
+            <div class="quiz-ilustracion" aria-hidden="true"><span>🌍</span><i>✓</i></div>
+            <form id="form-cuestionario" class="quiz-panel">
+                <p class="ceja">Última parada · reflexión</p>
+                <h1 id="titulo-cuestionario">¿Qué te llevas de la misión?</h1>
+                <p class="entradilla">Tres preguntas cortas. Tus respuestas se guardarán junto a tu resultado.</p>
+                <fieldset><legend>1. ¿Qué residuo pertenece al contenedor de papel?</legend>
+                    <label><input type="radio" name="q1" value="botella" required> Botella plástica</label>
+                    <label><input type="radio" name="q1" value="caja"> Caja de cartón</label>
+                    <label><input type="radio" name="q1" value="lata"> Lata</label>
+                </fieldset>
+                <fieldset><legend>2. Al salir de una habitación conviene…</legend>
+                    <label><input type="radio" name="q2" value="apagar" required> apagar la luz si nadie la usa</label>
+                    <label><input type="radio" name="q2" value="dejar"> dejarla encendida</label>
+                </fieldset>
+                <fieldset><legend>3. Para ahorrar agua debemos…</legend>
+                    <label><input type="radio" name="q3" value="reparar" required> reparar las llaves que gotean</label>
+                    <label><input type="radio" name="q3" value="esperar"> esperar a que la fuga crezca</label>
+                </fieldset>
+                <label class="reflexion">En tus palabras, ¿qué aprendiste sobre reciclaje?
+                    <textarea id="respuesta-aprendizaje" maxlength="500" minlength="8" required placeholder="Aprendí que…"></textarea>
+                </label>
+                <p id="quiz-error" class="error-sala oculto" role="alert"></p>
+                <button id="enviar-cuestionario" class="boton-principal" type="submit">Guardar y ver clasificación →</button>
+            </form>
+        </section>
+
         <section id="pantalla-juego" class="pantalla juego oculto" aria-label="Partida en curso">
             <div class="barra-mision">
+                <div class="etapa-chip"><small>Ruta</small><strong>01</strong><span>/ 04</span></div>
                 <div>
                     <span class="ceja">Misión actual</span>
                     <strong id="mision-texto">Limpia el sendero</strong>
@@ -154,7 +212,20 @@
                         <button id="boton-continuar" class="boton-principal" type="button">Continuar</button>
                         <button id="boton-salir" class="boton-secundario" type="button">Volver al inicio</button>
                     </div>
+                    <section id="tutorial" class="tutorial oculto" aria-live="polite" aria-label="Tutorial interactivo">
+                        <div class="tutorial-paso"><span id="tutorial-numero">1 de 3</span><strong id="tutorial-titulo">Muévete por el parque</strong></div>
+                        <p id="tutorial-texto">Usa las flechas, WASD o la cruceta táctil. El tutorial avanzará cuando te muevas.</p>
+                        <button id="tutorial-omitir" type="button">Omitir tutorial</button>
+                    </section>
                 </div>
+
+                <section id="panel-ecosistema" class="panel-ecosistema oculto" aria-label="Salud del ecosistema">
+                    <strong>Equilibrio ecológico</strong>
+                    <div><span>Agua</span><meter id="eco-agua" min="0" max="100" value="35"></meter><output id="eco-agua-valor">35</output></div>
+                    <div><span>Suelo</span><meter id="eco-suelo" min="0" max="100" value="35"></meter><output id="eco-suelo-valor">35</output></div>
+                    <div><span>Vida</span><meter id="eco-vida" min="0" max="100" value="35"></meter><output id="eco-vida-valor">35</output></div>
+                    <small>Lleva los tres indicadores a 75. Si uno cae a cero, toda la cadena se rompe.</small>
+                </section>
 
                 <div id="controles-tactiles" aria-label="Controles táctiles">
                     <div class="cruceta">
@@ -174,12 +245,14 @@
                 <div id="medalla-final" class="medalla" aria-hidden="true">🌱</div>
                 <h1 id="titulo-final">¡El parque respira mejor!</h1>
                 <p id="final-resumen" class="entradilla"></p>
+                <div id="final-versus" class="resultado-versus oculto" role="status" aria-live="polite"></div>
                 <div class="resultado-grid">
                     <div><span>Puntuación</span><strong id="final-puntos">0</strong></div>
                     <div><span>Reciclados</span><strong id="final-reciclados">0</strong></div>
                     <div><span>Mejor racha</span><strong id="final-racha">0</strong></div>
                     <div><span>Precisión</span><strong id="final-precision">0%</strong></div>
                 </div>
+                <div id="desglose-etapas" class="desglose-etapas" aria-label="Puntaje por etapa"></div>
                 <p id="final-reto" class="reto-final"></p>
                 <div class="acciones-final">
                     <button id="boton-jugar-de-nuevo" class="boton-principal" type="button">Nueva patrulla</button>
@@ -199,7 +272,8 @@
                 <div><p class="ceja">Accesibilidad</p><h2>Ajustes</h2></div>
                 <button class="boton-icono" value="cancel" aria-label="Cerrar ajustes">×</button>
             </div>
-            <label class="interruptor"><span><strong>Sonido</strong><small>Señales y recompensas</small></span><input id="ajuste-sonido" type="checkbox" checked></label>
+            <label class="interruptor"><span><strong>Efectos de sonido</strong><small>Acciones, alertas y recompensas</small></span><input id="ajuste-sonido" type="checkbox" checked></label>
+            <label class="interruptor"><span><strong>Música</strong><small>Melodía ambiental durante la partida</small></span><input id="ajuste-musica" type="checkbox" checked></label>
             <label class="interruptor"><span><strong>Partículas</strong><small>Hojas, polvo y destellos</small></span><input id="ajuste-particulas" type="checkbox" checked></label>
             <label class="interruptor"><span><strong>Sacudida de cámara</strong><small>Impactos y errores</small></span><input id="ajuste-sacudida" type="checkbox" checked></label>
             <label class="interruptor"><span><strong>Alto contraste</strong><small>Refuerza bordes y señales</small></span><input id="ajuste-contraste" type="checkbox"></label>
@@ -207,6 +281,7 @@
         </form>
     </dialog>
 
+    <script src="{{ url_for('static', filename='js/minigames.js') }}"></script>
     <script src="{{ url_for('static', filename='js/game.js') }}"></script>
 </body>
 </html>

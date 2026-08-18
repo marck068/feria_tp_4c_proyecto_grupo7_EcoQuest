@@ -12,6 +12,7 @@ No se necesita ningún servidor de base de datos externo: el archivo
 """
 
 import sqlite3
+import json
 from pathlib import Path
 from datetime import datetime
 
@@ -37,6 +38,25 @@ def inicializar_bd():
                 puntos INTEGER NOT NULL,
                 objetos_reciclados INTEGER NOT NULL DEFAULT 0,
                 fecha TEXT NOT NULL
+            )
+            """
+        )
+        columnas = {fila[1] for fila in conexion.execute("PRAGMA table_info(puntuaciones)")}
+        if "puntajes_etapas" not in columnas:
+            conexion.execute("ALTER TABLE puntuaciones ADD COLUMN puntajes_etapas TEXT NOT NULL DEFAULT '{}'")
+        if "modo" not in columnas:
+            conexion.execute("ALTER TABLE puntuaciones ADD COLUMN modo TEXT NOT NULL DEFAULT 'individual'")
+        conexion.execute(
+            """
+            CREATE TABLE IF NOT EXISTS cuestionarios (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                puntuacion_id INTEGER NOT NULL,
+                nombre_jugador TEXT NOT NULL,
+                respuestas TEXT NOT NULL,
+                respuestas_correctas INTEGER NOT NULL,
+                aprendizaje TEXT NOT NULL,
+                fecha TEXT NOT NULL,
+                FOREIGN KEY (puntuacion_id) REFERENCES puntuaciones(id)
             )
             """
         )
@@ -89,3 +109,31 @@ def obtener_mejores_puntuaciones(limite=10):
         ).fetchall()
 
         return [dict(fila) for fila in filas]
+
+
+def guardar_resultado(nombre, puntos, objetos, puntajes_etapas, modo,
+                      respuestas, correctas, aprendizaje):
+    """Guarda como una unidad la campaña completa y su reflexión final."""
+    fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with obtener_conexion() as conexion:
+        cursor = conexion.execute(
+            """
+            INSERT INTO puntuaciones
+                (nombre_jugador, puntos, objetos_reciclados, fecha, puntajes_etapas, modo)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (nombre, puntos, objetos, fecha_actual,
+             json.dumps(puntajes_etapas, ensure_ascii=False), modo),
+        )
+        puntuacion_id = cursor.lastrowid
+        conexion.execute(
+            """
+            INSERT INTO cuestionarios
+                (puntuacion_id, nombre_jugador, respuestas, respuestas_correctas, aprendizaje, fecha)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (puntuacion_id, nombre, json.dumps(respuestas, ensure_ascii=False),
+             correctas, aprendizaje, fecha_actual),
+        )
+        conexion.commit()
+        return puntuacion_id

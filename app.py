@@ -18,15 +18,18 @@ import random
 
 from flask import Flask, render_template, request, jsonify
 
-from database import inicializar_bd, guardar_puntuacion, obtener_mejores_puntuaciones
+from database import (inicializar_bd, guardar_puntuacion,
+                      obtener_mejores_puntuaciones, guardar_resultado)
 
 app = Flask(__name__)
 inicializar_bd()
 
 salas = {}
 bloqueo_salas = threading.Lock()
-MAX_JUGADORES = 2
+MIN_JUGADORES = 2
+MAX_JUGADORES = 10
 RETARDO_INICIO_RED = 3.0
+DURACION_ETAPA_PARQUE = 75
 CONTENEDORES_RED = {
     "plastico": (100, 72), "papel": (290, 72), "vidrio": (480, 72),
     "organico": (670, 72), "metal": (860, 72),
@@ -65,8 +68,8 @@ def jugador_publico(jugador):
     return {
         clave: jugador[clave]
         for clave in ("id", "nombre", "personaje", "x", "y", "puntos",
-                    "reciclados", "racha", "vida", "terminado", "llevando",
-                    "boost", "boost_hasta", "vx", "vy", "actualizacion_ms")
+                      "reciclados", "racha", "vida", "terminado", "llevando",
+                      "boost", "boost_hasta", "vx", "vy", "actualizacion_ms")
     }
 
 
@@ -102,7 +105,7 @@ def iniciar_mundo_red(sala, inicio=None):
     ahora = inicio if inicio is not None else time.time()
     sala["secuencia"] = 0
     sala["mundo"] = {
-        "residuos": [], "ayudas": [], "inicio": ahora, "tiempo": 75,
+        "residuos": [], "ayudas": [], "inicio": ahora, "tiempo": DURACION_ETAPA_PARQUE,
         "proxima_aparicion": ahora + 2.2, "proxima_ayuda": ahora + 7,
     }
     for _ in range(4):
@@ -117,7 +120,8 @@ def actualizar_mundo_red(sala):
     if sala["estado"] != "jugando" or not mundo:
         return
     ahora = time.time()
-    mundo["tiempo"] = max(0, min(75, 75 - (ahora - mundo["inicio"])))
+    mundo["tiempo"] = max(0, min(DURACION_ETAPA_PARQUE,
+                                  DURACION_ETAPA_PARQUE - (ahora - mundo["inicio"])))
     if ahora < mundo["inicio"]:
         return
 
@@ -215,6 +219,8 @@ def estado_publico_sala(sala, jugador):
         "estado": sala["estado"],
         "eres_anfitrion": jugador["id"] == sala["anfitrion"],
         "jugadores": [jugador_publico(j) for j in sala["jugadores"].values()],
+        "min_jugadores": MIN_JUGADORES,
+        "max_jugadores": MAX_JUGADORES,
         "mundo": mundo_publico,
         "servidor_ms": int(ahora * 1000),
         "inicio_ms": int(mundo["inicio"] * 1000) if mundo else None,
@@ -258,6 +264,32 @@ def api_guardar_puntuacion():
     return jsonify({"id": nuevo_id, "mensaje": "Puntuación guardada correctamente"}), 201
 
 
+@app.post("/api/resultados")
+def api_guardar_resultado():
+    datos = request.get_json(silent=True) or {}
+    nombre = str(datos.get("nombre", "")).strip()[:20] or "Anónimo"
+    aprendizaje = str(datos.get("aprendizaje", "")).strip()[:500]
+    respuestas = datos.get("respuestas", {})
+    etapas = datos.get("puntajes_etapas", {})
+    modo = str(datos.get("modo", "individual"))[:20]
+    if not aprendizaje:
+        return jsonify({"error": "Cuéntanos brevemente qué aprendiste"}), 400
+    if not isinstance(respuestas, dict) or not isinstance(etapas, dict):
+        return jsonify({"error": "El resultado no tiene un formato válido"}), 400
+    try:
+        puntos = int(datos.get("puntos", 0))
+        objetos = int(datos.get("objetos_reciclados", 0))
+        correctas = int(datos.get("respuestas_correctas", 0))
+        etapas_limpias = {str(k)[:30]: max(0, min(int(v), 100000)) for k, v in etapas.items()}
+    except (TypeError, ValueError):
+        return jsonify({"error": "Los puntajes deben ser números"}), 400
+    if not 0 <= puntos <= 400000 or not 0 <= objetos <= 1000 or not 0 <= correctas <= 3:
+        return jsonify({"error": "Resultado fuera del rango permitido"}), 400
+    nuevo_id = guardar_resultado(nombre, puntos, objetos, etapas_limpias, modo,
+                                 respuestas, correctas, aprendizaje)
+    return jsonify({"id": nuevo_id, "mensaje": "Campaña guardada"}), 201
+
+
 @app.post("/api/salas")
 def api_crear_sala():
     datos = request.get_json(silent=True) or {}
@@ -280,7 +312,7 @@ def api_crear_sala():
             "jugadores": {
                 jugador_id: {
                     "id": jugador_id, "token": token, "nombre": nombre,
-                    "personaje": personaje, "x": 430, "y": 500, "puntos": 0,
+                    "personaje": personaje, "x": 430, "y": 430, "puntos": 0,
                     "reciclados": 0, "racha": 0, "vida": 3, "terminado": False,
                     "llevando": None, "boost": None, "boost_hasta": 0,
                     "vx": 0, "vy": 0, "actualizacion_ms": int(time.time() * 1000),
@@ -301,13 +333,20 @@ def api_unirse_sala(codigo):
             return jsonify({"error": "La partida ya comenzó"}), 409
         if len(sala["jugadores"]) >= MAX_JUGADORES:
             return jsonify({"error": "La sala está completa"}), 409
-        jugador_id = "j2"
+        numero_jugador = next(
+            numero for numero in range(2, MAX_JUGADORES + 1)
+            if f"j{numero}" not in sala["jugadores"]
+        )
+        jugador_id = f"j{numero_jugador}"
         token = secrets.token_urlsafe(24)
+        columna = (numero_jugador - 1) % 5
+        fila = (numero_jugador - 1) // 5
         sala["jugadores"][jugador_id] = {
             "id": jugador_id, "token": token,
-            "nombre": str(datos.get("nombre", "")).strip()[:20] or "Jugador 2",
+            "nombre": str(datos.get("nombre", "")).strip()[:20] or f"Jugador {numero_jugador}",
             "personaje": str(datos.get("personaje", "guardaparque"))[:20],
-            "x": 530, "y": 500, "puntos": 0, "reciclados": 0, "racha": 0,
+            "x": 320 + columna * 80, "y": 390 + fila * 70,
+            "puntos": 0, "reciclados": 0, "racha": 0,
             "vida": 3, "terminado": False,
             "llevando": None, "boost": None, "boost_hasta": 0,
             "vx": 0, "vy": 0, "actualizacion_ms": int(time.time() * 1000),
@@ -335,8 +374,8 @@ def api_iniciar_sala(codigo):
         sala, jugador = obtener_sala_jugador(codigo, token)
         if not sala or not jugador or jugador["id"] != sala["anfitrion"]:
             return jsonify({"error": "Sólo el anfitrión puede iniciar"}), 403
-        if len(sala["jugadores"]) != MAX_JUGADORES:
-            return jsonify({"error": "Falta el segundo jugador"}), 409
+        if len(sala["jugadores"]) < MIN_JUGADORES:
+            return jsonify({"error": "Se necesitan al menos dos jugadores"}), 409
         sala["estado"] = "jugando"
         sala["actualizada"] = time.time()
         iniciar_mundo_red(sala, time.time() + RETARDO_INICIO_RED)
